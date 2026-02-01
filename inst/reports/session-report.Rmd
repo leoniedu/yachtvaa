@@ -34,19 +34,17 @@ date_long     <- format(session_date, "%d de %B de %Y")
 date_short    <- format(session_date, "%d %b %Y")
 ```
 
-Este relatório analisa o treino matinal de remo no Yacht Club da Bahia em
-**`r date_long`**. Os dados de GPS são baixados da plataforma Treinus e
-os dados ambientais da boia SIMCOSTA 515. O relatório calcula os trechos mais
-rápidos de 500 m em linha reta e examina como vento e corrente influenciaram
-cada desempenho.
+Treino de **`r date_long`** -- GPS via Treinus, boia SIMCOSTA 515. Trechos mais rápidos de 500 m vs. vento e corrente.
 
 ## 1 -- Pacotes
 
 ```{r packages}
 library(yachtvaa)
 library(dplyr)
+library(tidyr)
 library(sf)
 library(ggplot2)
+library(patchwork)
 library(lubridate)
 ```
 
@@ -153,16 +151,20 @@ paddlers |>
   arrange(desc(track_distance_m)) |>
   mutate(
     track_distance_km = round(track_distance_m / 1000, 1),
-    duration_min      = round(duration_min, 0),
-    speed_kmh = round((track_distance_m/duration_min) * 60 / 1000,1)
+    duration_fmt = sprintf("%d:%02d", floor(duration_min / 60), round(duration_min %% 60)),
+    speed_kmh = round((track_distance_m / duration_min) * 60 / 1000, 1)
   ) |>
-  select(fullname_athlete, n_fixes, duration_min, track_distance_km, speed_kmh) |>
-  gt::gt()%>%
-  gt::cols_label(fullname_athlete="Atleta", 
-  n_fixes="Pontos GPS", 
-  duration_min="Duração (min)", 
-  track_distance_km="Distância (km)", speed_kmh="Velocidade Km/h")%>%
-    gt::tab_caption("Atletas identificados na água")
+  select(fullname_athlete, n_fixes, duration_fmt, track_distance_km, speed_kmh) |>
+  gt::gt() |>
+  gt::cols_label(
+    fullname_athlete = "Atleta",
+    n_fixes = "Pontos GPS",
+    duration_fmt = "Duração (h:mm)",
+    track_distance_km = "Distância (km)",
+    speed_kmh = "Vel. (km/h)"
+  ) |>
+  gt::tab_caption("Atletas identificados na água") |>
+  gt::opt_interactive()
 ```
 
 ```{r filter-paddlers}
@@ -213,7 +215,7 @@ fast500 <- fast500 |>
 
 ## 4 -- Mapa dos trechos mais rápidos
 
-```{r fastest-map, fig.height = 7, fig.cap = "Trechos mais rápidos de 500 m em linha reta. Setas indicam a direção do percurso."}
+```{r fastest-map, fig.height = 5, fig.cap = "Trechos mais rápidos de 500 m em linha reta. Setas indicam a direção do percurso."}
 arrow_df <- fast500 |>
   as_tibble()
 
@@ -251,78 +253,97 @@ ggplot() +
   )
 ```
 
-## 5 -- Condições da boia durante o treino
+## 5 -- Condições da boia
 
-Interpolar os dados da boia em uma grade regular de 10 minutos.
-
-```{r buoy-interp}
+```{r buoy-setup, include = FALSE}
 buoy_ip <- interpolate_buoy(buoy)
-```
 
-### Vento
-
-```{r wind-available}
 has_wind <- "wind_speed" %in% names(buoy_ip) &&
   any(!is.na(buoy_ip$wind_speed))
-```
 
-```{r wind-ts, eval = has_wind, fig.height = 6, fig.cap = "Velocidade e direção do vento registradas pela boia SIMCOSTA 515."}
-buoy_wind <- buoy_ip |>
-  filter(!is.na(wind_speed)) |>
-  mutate(
-    wind_speed_kmh = wind_speed * 3.6,
-    local_time     = with_tz(datetime, tzone = "America/Bahia")
-  )
+# Limit buoy data to the training period
+records_time_range <- range(records_sf$timestamp)
+buoy_ip_training <- buoy_ip |>
+  filter(datetime >= records_time_range[1], datetime <= records_time_range[2])
 
-p_speed <- ggplot(buoy_wind, aes(local_time, wind_speed_kmh)) +
-  geom_line(linewidth = 0.8, colour = "#0072B2") +
-  geom_point(size = 1.5, colour = "#0072B2") +
-  labs(y = "Velocidade do vento (km/h)", x = NULL, title = "Condições de vento") +
-  theme_minimal(base_size = 11)
-
-p_dir <- ggplot(buoy_wind, aes(local_time, wind_direction)) +
-  geom_line(linewidth = 0.8, colour = "#D55E00") +
-  geom_point(size = 1.5, colour = "#D55E00") +
-  scale_y_continuous(
-    limits = c(0, 360),
-    breaks = seq(0, 360, 90),
-    labels = c("N", "E", "S", "W", "N")
-  ) +
-  labs(y = "Direção do vento (de)", x = "Hora local (America/Bahia)") +
-  theme_minimal(base_size = 11)
-
-gridExtra::grid.arrange(p_speed, p_dir, ncol = 1)
-```
-
-```{r wind-missing-note, eval = !has_wind, results = "asis"}
-cat("**Sem dados de vento disponíveis para este treino.** O vento será tratado como zero.\n")
-```
-
-### Corrente
-
-```{r current-ts, fig.height = 6, fig.cap = "Velocidade e direção da corrente registradas pela boia 515."}
-buoy_current <- buoy_ip |>
+buoy_current <- buoy_ip_training |>
   filter(!is.na(current_speed_kmh)) |>
   mutate(local_time = with_tz(datetime, tzone = "America/Bahia"))
 
-p_cspeed <- ggplot(buoy_current, aes(local_time, current_speed_kmh)) +
-  geom_line(linewidth = 0.8, colour = "#009E73") +
-  geom_point(size = 1.5, colour = "#009E73") +
-  labs(y = "Velocidade da corrente (km/h)", x = NULL, title = "Condições de corrente") +
-  theme_minimal(base_size = 11)
+if (has_wind) {
+  buoy_wind <- buoy_ip_training |>
+    filter(!is.na(wind_speed)) |>
+    mutate(
+      wind_speed_kmh = wind_speed * 3.6,
+      local_time     = with_tz(datetime, tzone = "America/Bahia")
+    )
+}
+```
 
-p_cdir <- ggplot(buoy_current, aes(local_time, current_direction)) +
-  geom_line(linewidth = 0.8, colour = "#CC79A7") +
-  geom_point(size = 1.5, colour = "#CC79A7") +
-  scale_y_continuous(
-    limits = c(0, 360),
-    breaks = seq(0, 360, 90),
-    labels = c("N", "E", "S", "W", "N")
-  ) +
-  labs(y = "Direção da corrente (para)", x = "Hora local (America/Bahia)") +
-  theme_minimal(base_size = 11)
+```{r buoy-table, echo = FALSE}
+buoy_local <- buoy_ip_training |>
+  mutate(
+    local_time = with_tz(datetime, "America/Bahia"),
+    hour = format(floor_date(local_time, "hour"), "%Hh")
+  )
 
-gridExtra::grid.arrange(p_cspeed, p_cdir, ncol = 1)
+current_h <- buoy_local |>
+  filter(!is.na(current_speed_kmh)) |>
+  summarise(
+    speed = round(mean(current_speed_kmh, na.rm = TRUE), 1),
+    dir   = round(mean(current_direction, na.rm = TRUE), 0),
+    .by = hour
+  ) |>
+  arrange(hour)
+
+dir_arrow <- function(deg, from = FALSE) {
+  if (from) deg <- (deg + 180) %% 360
+  arrows <- c("\u2191", "\u2197", "\u2192", "\u2198",
+              "\u2193", "\u2199", "\u2190", "\u2196")
+  ifelse(is.na(deg), "\u2014", arrows[(round(deg / 45) %% 8) + 1])
+}
+
+metrics_long <- bind_rows(
+  tibble(hour = current_h$hour, metric = "Corrente (km/h)",
+         value = as.character(current_h$speed)),
+  tibble(hour = current_h$hour, metric = "Dir. corrente",
+         value = dir_arrow(current_h$dir))
+)
+
+if (has_wind) {
+  wind_h <- buoy_local |>
+    filter(!is.na(wind_speed)) |>
+    summarise(
+      speed = round(mean(wind_speed * 3.6, na.rm = TRUE), 0),
+      dir   = round(mean(wind_direction, na.rm = TRUE), 0),
+      .by = hour
+    ) |>
+    arrange(hour)
+
+  metrics_long <- bind_rows(
+    tibble(hour = wind_h$hour, metric = "Vento (km/h)",
+           value = as.character(wind_h$speed)),
+    tibble(hour = wind_h$hour, metric = "Dir. vento",
+           value = dir_arrow(wind_h$dir, from = TRUE)),
+    metrics_long
+  )
+}
+
+metric_order <- c("Vento (km/h)", "Dir. vento", "Corrente (km/h)", "Dir. corrente")
+all_hours <- sort(unique(metrics_long$hour))
+
+metrics_wide <- metrics_long |>
+  mutate(
+    metric = factor(metric, levels = metric_order),
+    hour = factor(hour, levels = all_hours)
+  ) |>
+  arrange(metric, hour) |>
+  pivot_wider(names_from = hour, values_from = value, values_fill = "\u2014")
+
+metrics_wide |>
+  gt::gt() |>
+  gt::cols_label(metric = "") |>
+  gt::tab_caption(paste("Boia SIMCOSTA 515 \u2014", date_short))
 ```
 
 ## 6 -- Condições nos trechos mais rápidos
@@ -354,85 +375,56 @@ Quando dados de vento não estão disponíveis, são imputados como zero.
 conditions <- apparent_conditions(matched, impute_missing_wind = !has_wind)
 ```
 
-### Corrente relativa ao rumo
+**Topo = a favor**, **base = contrário**. Raio = intensidade; cor = velocidade do atleta.
 
-Direção da corrente em relação ao rumo do trecho mais rápido de cada atleta.
-**Topo = corrente a favor** (de popa), **base = corrente contrária** (de proa).
-O raio indica a intensidade da corrente.
-
-```{r current-polar, fig.height = 6, fig.cap = "Corrente relativa ao rumo: topo = a favor, base = contrária. Raio = velocidade da corrente."}
+```{r polar-plots, fig.height = 5, fig.width = 14, fig.cap = "Corrente e vento relativos ao rumo do trecho mais rápido."}
 current_polar <- conditions |>
   as_tibble() |>
   filter(!is.na(current_speed_kmh)) |>
-  mutate(
-    current_relative_deg = (current_direction_deg - bearing_deg) %% 360
-  )
+  mutate(current_relative_deg = (current_direction_deg - bearing_deg) %% 360)
 
 current_r_max <- max(5, max(current_polar$current_speed_kmh, na.rm = TRUE))
 
-ggplot(current_polar, aes(x = current_relative_deg, y = current_speed_kmh)) +
+p_current <- ggplot(current_polar, aes(x = current_relative_deg, y = current_speed_kmh)) +
   geom_point(aes(colour = avg_speed_kmh), size = 3) +
-  ggrepel::geom_text_repel(
-    aes(label = fullname_athlete),
-    size = 2.5, max.overlaps = 20
-  ) +
+  ggrepel::geom_text_repel(aes(label = fullname_athlete), size = 2.5, max.overlaps = 20) +
   coord_polar(start = 0, direction = -1) +
   scale_x_continuous(
-    limits = c(0, 360),
-    breaks = c(0, 90, 180, 270),
+    limits = c(0, 360), breaks = c(0, 90, 180, 270),
     labels = c("A favor", "90\u00b0", "Contra", "270\u00b0")
   ) +
   scale_y_continuous(limits = c(0, current_r_max)) +
-  scale_colour_viridis_c(option = "plasma", name = "Vel. atleta\n(km/h)") +
-  labs(
-    title    = "Corrente relativa ao rumo do trecho mais rápido",
-    subtitle = "Topo = a favor, base = contrária; cor = velocidade do atleta",
-    x = NULL,
-    y = "Vel. corrente (km/h)"
-  ) +
-  theme_minimal(base_size = 11)
-```
+  scale_colour_viridis_c(option = "plasma", name = "Vel. (km/h)") +
+  labs(title = "Corrente", x = NULL, y = "Vel. corrente (km/h)") +
+  theme_minimal(base_size = 10)
 
-### Vento relativo ao rumo
+if (has_wind) {
+  wind_polar <- conditions |>
+    as_tibble() |>
+    filter(!is.na(wind_speed_kmh)) |>
+    mutate(wind_relative_deg = (wind_direction_deg + 180 - bearing_deg) %% 360)
 
-Mesma lógica aplicada ao vento. **Topo = vento a favor** (de popa),
-**base = vento contrário** (de proa).
+  wind_r_max <- max(30, max(wind_polar$wind_speed_kmh, na.rm = TRUE))
 
-```{r wind-polar, eval = has_wind, fig.height = 6, fig.cap = "Vento relativo ao rumo: topo = a favor, base = contrário. Raio = velocidade do vento."}
-wind_polar <- conditions |>
-  as_tibble() |>
-  filter(!is.na(wind_speed_kmh)) |>
-  mutate(
-    wind_relative_deg = (wind_direction_deg + 180 - bearing_deg) %% 360
-  )
+  p_wind <- ggplot(wind_polar, aes(x = wind_relative_deg, y = wind_speed_kmh)) +
+    geom_point(aes(colour = avg_speed_kmh), size = 3) +
+    ggrepel::geom_text_repel(aes(label = fullname_athlete), size = 2.5, max.overlaps = 20) +
+    coord_polar(start = 0, direction = -1) +
+    scale_x_continuous(
+      limits = c(0, 360), breaks = c(0, 90, 180, 270),
+      labels = c("A favor", "90\u00b0", "Contra", "270\u00b0")
+    ) +
+    scale_y_continuous(limits = c(0, wind_r_max)) +
+    scale_colour_viridis_c(option = "plasma", name = "Vel. (km/h)") +
+    labs(title = "Vento", x = NULL, y = "Vel. vento (km/h)") +
+    theme_minimal(base_size = 10)
 
-wind_r_max <- max(30, max(wind_polar$wind_speed_kmh, na.rm = TRUE))
-
-ggplot(wind_polar, aes(x = wind_relative_deg, y = wind_speed_kmh)) +
-  geom_point(aes(colour = avg_speed_kmh), size = 3) +
-  ggrepel::geom_text_repel(
-    aes(label = fullname_athlete),
-    size = 2.5, max.overlaps = 20
-  ) +
-  coord_polar(start = 0, direction = -1) +
-  scale_x_continuous(
-    limits = c(0, 360),
-    breaks = c(0, 90, 180, 270),
-    labels = c("A favor", "90\u00b0", "Contra", "270\u00b0")
-  ) +
-  scale_y_continuous(limits = c(0, wind_r_max)) +
-  scale_colour_viridis_c(option = "plasma", name = "Vel. atleta\n(km/h)") +
-  labs(
-    title    = "Vento relativo ao rumo do trecho mais rápido",
-    subtitle = "Topo = a favor, base = contrário; cor = velocidade do atleta",
-    x = NULL,
-    y = "Vel. vento (km/h)"
-  ) +
-  theme_minimal(base_size = 11)
-```
-
-```{r wind-polar-missing, eval = !has_wind, results = "asis"}
-cat("**Sem dados de vento disponíveis.** Gráfico polar de vento omitido.\n")
+  p_current + p_wind +
+    plot_layout(guides = "collect") &
+    theme(legend.position = "bottom")
+} else {
+  p_current
+}
 ```
 
 ## 7 -- Classificação
@@ -441,24 +433,43 @@ cat("**Sem dados de vento disponíveis.** Gráfico polar de vento omitido.\n")
 league <- build_league_table(conditions, athlete_col = "fullname_athlete")
 league_fmt <- format_league(league, top_n = 15)
 
+wind_class_pt <- c(
+  calm = "calmo", headwind = "contra", tailwind = "a favor",
+  crosswind_right = "lateral dir.", crosswind_left = "lateral esq."
+)
+current_class_pt <- c(
+  following = "a favor", opposing = "contra",
+  cross_right = "lateral dir.", cross_left = "lateral esq."
+)
+
 league_fmt |>
+  mutate(
+    tempo = sprintf("%d:%02d", floor(predicted_time_sec / 60),
+                    round(predicted_time_sec %% 60)),
+    avg_speed_kmh         = round(avg_speed_kmh, 1),
+    wind_class            = wind_class_pt[wind_class],
+    wind_component_kmh    = round(wind_component_kmh, 1),
+    current_class         = current_class_pt[current_class],
+    current_component_kmh = round(current_component_kmh, 1)
+  ) |>
   select(
-    rank, fullname_athlete, predicted_time_fmt, avg_speed_kmh,
+    rank, fullname_athlete, tempo, avg_speed_kmh,
     wind_class, wind_component_kmh,
     current_class, current_component_kmh
   ) |>
-  mutate(
-    avg_speed_kmh         = round(avg_speed_kmh, 1),
-    wind_component_kmh    = round(wind_component_kmh, 1),
-    current_component_kmh = round(current_component_kmh, 1)
+  gt::gt() |>
+  gt::cols_label(
+    rank = "Pos.",
+    fullname_athlete = "Atleta",
+    tempo = "Tempo",
+    avg_speed_kmh = "Vel. (km/h)",
+    wind_class = "Vento",
+    wind_component_kmh = "Vento (km/h)",
+    current_class = "Corrente",
+    current_component_kmh = "Corrente (km/h)"
   ) |>
-  knitr::kable(
-    col.names = c(
-      "Pos.", "Atleta", "Tempo", "Vel. (km/h)",
-      "Vento", "Vento (km/h)", "Corrente", "Corrente (km/h)"
-    ),
-    caption = paste("Classificação: 500 m mais rápidos em", date_short)
-  )
+  gt::tab_caption(paste("Classificação: 500 m mais rápidos em", date_short)) |>
+  gt::opt_interactive()
 ```
 
 ## 8 -- Resumo do treino
@@ -471,8 +482,12 @@ current_summary <- buoy_current |>
     mean_dir   = round(mean(current_direction, na.rm = TRUE), 0)
   )
 
+avg_dur_min <- mean(paddlers$duration_min, na.rm = TRUE)
+avg_dur_fmt <- sprintf("%d:%02d", floor(avg_dur_min / 60), round(avg_dur_min %% 60))
+
 winner      <- league_fmt$fullname_athlete[1]
-winner_time <- league_fmt$predicted_time_fmt[1]
+winner_sec  <- league_fmt$predicted_time_sec[1]
+winner_time <- sprintf("%d:%02d", floor(winner_sec / 60), round(winner_sec %% 60))
 winner_kmh  <- round(league_fmt$avg_speed_kmh[1], 1)
 
 if (has_wind) {
@@ -494,11 +509,13 @@ cat(sprintf(
   "**Resumo do treino:**\n\n
 - **Data:** %s
 - **Atletas na água:** %d
+- **Duração média:** %s (h:mm)
 %s
 - **Corrente:** média %s km/h (máx %s), fluindo para %s°
 - **500 m mais rápido:** %s em %s (%s km/h)\n",
   date_label,
   n_paddlers,
+  avg_dur_fmt,
   wind_line,
   current_summary$mean_speed, current_summary$max_speed, current_summary$mean_dir,
   winner, winner_time, winner_kmh

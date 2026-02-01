@@ -8,7 +8,7 @@ output:
     theme: flatly
     code_folding: show
 params:
-  date: "2026-01-29"
+  date: "2026-01-31"
   start_time: "01:00"
   end_time: "23:00"
   athlete_ids: !expr 1:70
@@ -72,10 +72,13 @@ raw <- fetch_session_data(
   use_memoise=FALSE
 )
 
-records <- raw$records
+records <- raw$records%>%
+  mutate(fullname_athlete = tolower(fullname_athlete))
 buoy    <- raw$buoy
 
-# Filtro espacial: manter apenas pontos GPS dentro da área de estudo
+# Filtro espacial: manter todos os registros para atletas que têm pelo menos
+# alguns pontos dentro da área de estudo (ao invés de manter apenas os
+# pontos dentro da bbox)
 records_sf <- records_to_sf(records)
 study_area <- sf::st_bbox(
   c(xmin = -38.61380, ymin = -13.00741,
@@ -84,7 +87,26 @@ study_area <- sf::st_bbox(
 ) |>
   sf::st_as_sfc() |>
   sf::st_transform(sf::st_crs(records_sf))
-records_sf <- records_sf[lengths(sf::st_intersects(records_sf, study_area)) > 0, ]
+
+# Identificar atletas que têm pelo menos um ponto dentro da área de estudo
+athletes_in_bbox <- records_sf[
+  lengths(sf::st_intersects(records_sf, study_area)) > 0,
+  "id_athlete"
+]
+
+# Manter todos os registros para esses atletas
+records_sf <- records_sf[records_sf$id_athlete %in% athletes_in_bbox$id_athlete, ]
+
+# Criar versão filtrada para cálculos de velocidade (apenas pontos dentro da bbox)
+records_sf_bbox <- records_sf[
+  lengths(sf::st_intersects(records_sf, study_area)) > 0,
+]
+
+# Documentação da lógica de filtragem espacial:
+# 1. Identificamos atletas que têm pelo menos um ponto dentro da bbox
+# 2. Mantemos TODOS os registros desses atletas (não apenas os dentro da bbox)
+# 3. Para cálculos de velocidade (como no fast500), usamos apenas pontos dentro da bbox
+# 4. Aplicamos pós-filtro no fast500 para garantir início/fim dos segmentos dentro da bbox
 ```
 
 ## 3 -- Quem estava na água?
@@ -131,13 +153,16 @@ paddlers |>
   arrange(desc(track_distance_m)) |>
   mutate(
     track_distance_km = round(track_distance_m / 1000, 1),
-    duration_min      = round(duration_min, 0)
+    duration_min      = round(duration_min, 0),
+    speed_kmh = round((track_distance_m/duration_min) * 60 / 1000,1)
   ) |>
-  select(fullname_athlete, n_fixes, duration_min, track_distance_km) |>
-  knitr::kable(
-    col.names = c("Atleta", "Pontos GPS", "Duração (min)", "Distância (km)"),
-    caption   = "Atletas identificados na água"
-  )
+  select(fullname_athlete, n_fixes, duration_min, track_distance_km, speed_kmh) |>
+  gt::gt()%>%
+  gt::cols_label(fullname_athlete="Atleta", 
+  n_fixes="Pontos GPS", 
+  duration_min="Duração (min)", 
+  track_distance_km="Distância (km)", speed_kmh="Velocidade Km/h")%>%
+    gt::tab_caption("Atletas identificados na água")
 ```
 
 ```{r filter-paddlers}
@@ -149,11 +174,34 @@ n_paddlers <- nrow(paddlers)
 
 ```{r fastest-500, include = FALSE}
 fast500 <- fastest_straight_distance(
-  records_sf,
+  records_sf_bbox,
   athlete_col = "id_athlete",
   time_col    = "timestamp",
   distance_m  = 500
 )
+
+# Post-filtro: garantir que os pontos de início e fim dos segmentos estejam
+# dentro da área de estudo (bbox)
+if (nrow(fast500) > 0) {
+  # Criar pontos de início e fim dos segmentos
+  start_points <- sf::st_as_sf(
+    fast500,
+    coords = c("start_x", "start_y"),
+    crs = sf::st_crs(records_sf)
+  )
+  end_points <- sf::st_as_sf(
+    fast500,
+    coords = c("end_x", "end_y"),
+    crs = sf::st_crs(records_sf)
+  )
+
+  # Verificar quais estão dentro da bbox
+  start_in_bbox <- lengths(sf::st_intersects(start_points, study_area)) > 0
+  end_in_bbox <- lengths(sf::st_intersects(end_points, study_area)) > 0
+
+  # Filtrar resultados para manter apenas segmentos com ambos os pontos na bbox
+  fast500 <- fast500[start_in_bbox & end_in_bbox, ]
+}
 
 # Anexar nomes dos atletas
 fast500 <- fast500 |>
@@ -170,7 +218,7 @@ arrow_df <- fast500 |>
   as_tibble()
 
 basemap <- maptiles::get_tiles(records_sf, provider = "CartoDB.Positron",
-                               crop = TRUE, verbose = FALSE)
+                               crop = FALSE, verbose = FALSE)
 
 ggplot() +
   tidyterra::geom_spatraster_rgb(data = basemap) +

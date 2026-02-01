@@ -5,6 +5,14 @@ test_that("relative_wind returns correct tibble", {
   expect_equal(result$wind_class, "headwind")
 })
 
+test_that("relative_wind returns calm when wind_speed is zero", {
+  result <- relative_wind(0, 0, wind_speed = 0)
+  expect_equal(result$wind_class, "calm")
+
+  result <- relative_wind(45, 200, wind_speed = 0)
+  expect_equal(result$wind_class, "calm")
+})
+
 test_that("relative_current returns correct tibble", {
   result <- relative_current(0, 0)
   expect_s3_class(result, "tbl_df")
@@ -101,6 +109,7 @@ test_that("apparent_conditions imputes missing wind columns as zero", {
   expect_equal(result$wind_speed_kmh, c(0, 0))
   expect_equal(result$wind_direction_deg, c(0, 0))
   expect_equal(result$wind_component_kmh, c(0, 0))
+  expect_equal(result$wind_class, c("calm", "calm"))
   # Current should still be computed normally
   expect_true(result$current_component_kmh[1] > 0)   # following
   expect_true(result$current_component_kmh[2] < 0)   # opposing
@@ -122,6 +131,7 @@ test_that("apparent_conditions imputes all-NA wind as zero", {
 
   expect_equal(result$wind_speed_kmh, 0)
   expect_equal(result$wind_component_kmh, 0)
+  expect_equal(result$wind_class, "calm")
 })
 
 test_that("apparent_conditions does not warn when wind data is present", {

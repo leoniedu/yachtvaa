@@ -1,0 +1,458 @@
+---
+title: "`r format(as.Date(params$date), 'Treino: %d/%m/%Y')`"
+subtitle: "Yacht Club da Bahia -- Desempenho dos Remadores vs. Vento e Corrente"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: flatly
+    code_folding: show
+params:
+  date: "2026-01-29"
+  start_time: "01:00"
+  end_time: "23:00"
+  athlete_ids: !expr 1:70
+  cache: true
+---
+
+```{r setup, include = FALSE}
+Sys.setlocale("LC_CTYPE", "en_US.UTF-8")
+Sys.setlocale("LC_TIME", "pt_BR.UTF-8")
+knitr::opts_chunk$set(
+  collapse   = TRUE,
+  comment    = "#>",
+  fig.width  = 8,
+  fig.height = 5,
+  dpi        = 150,
+  warning    = FALSE,
+  message    = FALSE
+)
+
+session_date  <- as.Date(params$date)
+date_label    <- format(session_date, "%d/%m/%Y")
+date_long     <- format(session_date, "%d de %B de %Y")
+date_short    <- format(session_date, "%d %b %Y")
+```
+
+Este relatório analisa o treino matinal de remo no Yacht Club da Bahia em
+**`r date_long`**. Os dados de GPS são baixados da plataforma Treinus e
+os dados ambientais da boia SIMCOSTA 515. O relatório calcula os trechos mais
+rápidos de 500 m em linha reta e examina como vento e corrente influenciaram
+cada desempenho.
+
+## 1 -- Pacotes
+
+```{r packages}
+library(yachtvaa)
+library(dplyr)
+library(sf)
+library(ggplot2)
+library(lubridate)
+```
+
+## 2 -- Aquisição de dados
+
+Baixa os registros GPS dos remadores e os dados da boia SIMCOSTA 515 em uma
+única chamada. Com `cache = TRUE` os dados são lidos do disco sem necessidade
+de autenticação.
+
+```{r download}
+if (!params$cache) {
+ session <- treinusr::treinus_auth()
+}
+use_cache <- params$cache
+raw <- fetch_session_data(
+  session = session,
+  date        = params$date,
+  start_time  = params$start_time,
+  end_time    = params$end_time,
+  athlete_ids = params$athlete_ids,
+  cache       = use_cache,
+  overwrite_db=!use_cache,
+  use_memoise=FALSE
+)
+
+records <- raw$records
+buoy    <- raw$buoy
+
+# Filtro espacial: manter apenas pontos GPS dentro da área de estudo
+records_sf <- records_to_sf(records)
+study_area <- sf::st_bbox(
+  c(xmin = -38.61380, ymin = -13.00741,
+    xmax = -38.46308, ymax = -12.81308),
+  crs = 4326L
+) |>
+  sf::st_as_sfc() |>
+  sf::st_transform(sf::st_crs(records_sf))
+records_sf <- records_sf[lengths(sf::st_intersects(records_sf, study_area)) > 0, ]
+```
+
+## 3 -- Quem estava na água?
+
+Nem todo atleta retornado pelo Treinus realmente remou -- alguns podem ter
+registros GPS breves em terra.
+Mantemos apenas atletas com **pelo menos 100 pontos GPS** e percurso
+acumulado **superior a 200 m**.
+
+```{r identify-paddlers}
+track_summary <- records_sf |>
+  st_drop_geometry() |>
+  summarise(
+    n_fixes      = n(),
+    first_fix    = min(timestamp),
+    last_fix     = max(timestamp),
+    duration_min = as.numeric(difftime(max(timestamp), min(timestamp),
+                                       units = "mins")),
+    .by = c(id_athlete, fullname_athlete)
+  )
+
+# Distância acumulada ponto a ponto por atleta
+track_distance <- records_sf |>
+  arrange(id_athlete, timestamp) |>
+  mutate(
+    coords = st_coordinates(geometry),
+    x = coords[, 1],
+    y = coords[, 2],
+    .keep = "unused"
+  ) |>
+  st_drop_geometry() |>
+  summarise(
+    track_distance_m = sum(sqrt(diff(x)^2 + diff(y)^2)),
+    .by = id_athlete
+  )
+
+track_summary <- track_summary |>
+  left_join(track_distance, by = "id_athlete")
+
+paddlers <- track_summary |>
+  filter(n_fixes >= 100, track_distance_m >= 200)
+
+paddlers |>
+  arrange(desc(track_distance_m)) |>
+  mutate(
+    track_distance_km = round(track_distance_m / 1000, 1),
+    duration_min      = round(duration_min, 0)
+  ) |>
+  select(fullname_athlete, n_fixes, duration_min, track_distance_km) |>
+  knitr::kable(
+    col.names = c("Atleta", "Pontos GPS", "Duração (min)", "Distância (km)"),
+    caption   = "Atletas identificados na água"
+  )
+```
+
+```{r filter-paddlers}
+records_sf <- records_sf |>
+  filter(id_athlete %in% paddlers$id_athlete)
+
+n_paddlers <- nrow(paddlers)
+```
+
+```{r fastest-500, include = FALSE}
+fast500 <- fastest_straight_distance(
+  records_sf,
+  athlete_col = "id_athlete",
+  time_col    = "timestamp",
+  distance_m  = 500
+)
+
+# Anexar nomes dos atletas
+fast500 <- fast500 |>
+  left_join(
+    paddlers |> select(id_athlete, fullname_athlete),
+    by = "id_athlete"
+  )
+```
+
+## 4 -- Mapa dos trechos mais rápidos
+
+```{r fastest-map, fig.height = 7, fig.cap = "Trechos mais rápidos de 500 m em linha reta. Setas indicam a direção do percurso."}
+arrow_df <- fast500 |>
+  as_tibble()
+
+basemap <- maptiles::get_tiles(records_sf, provider = "CartoDB.Positron",
+                               crop = TRUE, verbose = FALSE)
+
+ggplot() +
+  tidyterra::geom_spatraster_rgb(data = basemap) +
+  geom_sf(data = records_sf, colour = "grey50", size = 0.1, alpha = 0.4) +
+  geom_segment(
+    data = arrow_df,
+    aes(x = start_x, y = start_y, xend = end_x, yend = end_y,
+        colour = avg_speed_kmh),
+    arrow = arrow(length = unit(0.3, "cm"), type = "closed"),
+    linewidth = 1.3
+  ) +
+  ggrepel::geom_text_repel(
+    data = arrow_df,
+    aes(x = (start_x + end_x) / 2, y = (start_y + end_y) / 2,
+        label = fullname_athlete),
+    size = 2.5, max.overlaps = 20,
+    bg.color = "white", bg.r = 0.15
+  ) +
+  scale_colour_viridis_c(option = "plasma", name = "Vel. (km/h)") +
+  coord_sf(crs = sf::st_crs(records_sf)) +
+  labs(
+    title    = paste("Trechos mais rápidos de 500 m --", date_short),
+    subtitle = "Setas indicam a direção do percurso; cor = velocidade do atleta"
+  ) +
+  theme_void(base_size = 11) +
+  theme(
+    legend.position = "bottom",
+    plot.title      = element_text(face = "bold"),
+    plot.margin     = margin(5, 5, 5, 5)
+  )
+```
+
+## 5 -- Condições da boia durante o treino
+
+Interpolar os dados da boia em uma grade regular de 10 minutos.
+
+```{r buoy-interp}
+buoy_ip <- interpolate_buoy(buoy)
+```
+
+### Vento
+
+```{r wind-available}
+has_wind <- "wind_speed" %in% names(buoy_ip) &&
+  any(!is.na(buoy_ip$wind_speed))
+```
+
+```{r wind-ts, eval = has_wind, fig.height = 6, fig.cap = "Velocidade e direção do vento registradas pela boia SIMCOSTA 515."}
+buoy_wind <- buoy_ip |>
+  filter(!is.na(wind_speed)) |>
+  mutate(
+    wind_speed_kmh = wind_speed * 3.6,
+    local_time     = with_tz(datetime, tzone = "America/Bahia")
+  )
+
+p_speed <- ggplot(buoy_wind, aes(local_time, wind_speed_kmh)) +
+  geom_line(linewidth = 0.8, colour = "#0072B2") +
+  geom_point(size = 1.5, colour = "#0072B2") +
+  labs(y = "Velocidade do vento (km/h)", x = NULL, title = "Condições de vento") +
+  theme_minimal(base_size = 11)
+
+p_dir <- ggplot(buoy_wind, aes(local_time, wind_direction)) +
+  geom_line(linewidth = 0.8, colour = "#D55E00") +
+  geom_point(size = 1.5, colour = "#D55E00") +
+  scale_y_continuous(
+    limits = c(0, 360),
+    breaks = seq(0, 360, 90),
+    labels = c("N", "E", "S", "W", "N")
+  ) +
+  labs(y = "Direção do vento (de)", x = "Hora local (America/Bahia)") +
+  theme_minimal(base_size = 11)
+
+gridExtra::grid.arrange(p_speed, p_dir, ncol = 1)
+```
+
+```{r wind-missing-note, eval = !has_wind, results = "asis"}
+cat("**Sem dados de vento disponíveis para este treino.** O vento será tratado como zero.\n")
+```
+
+### Corrente
+
+```{r current-ts, fig.height = 6, fig.cap = "Velocidade e direção da corrente registradas pela boia 515."}
+buoy_current <- buoy_ip |>
+  filter(!is.na(current_speed_kmh)) |>
+  mutate(local_time = with_tz(datetime, tzone = "America/Bahia"))
+
+p_cspeed <- ggplot(buoy_current, aes(local_time, current_speed_kmh)) +
+  geom_line(linewidth = 0.8, colour = "#009E73") +
+  geom_point(size = 1.5, colour = "#009E73") +
+  labs(y = "Velocidade da corrente (km/h)", x = NULL, title = "Condições de corrente") +
+  theme_minimal(base_size = 11)
+
+p_cdir <- ggplot(buoy_current, aes(local_time, current_direction)) +
+  geom_line(linewidth = 0.8, colour = "#CC79A7") +
+  geom_point(size = 1.5, colour = "#CC79A7") +
+  scale_y_continuous(
+    limits = c(0, 360),
+    breaks = seq(0, 360, 90),
+    labels = c("N", "E", "S", "W", "N")
+  ) +
+  labs(y = "Direção da corrente (para)", x = "Hora local (America/Bahia)") +
+  theme_minimal(base_size = 11)
+
+gridExtra::grid.arrange(p_cspeed, p_cdir, ncol = 1)
+```
+
+## 6 -- Condições nos trechos mais rápidos
+
+Associar cada segmento à observação mais próxima da boia via rolling join e
+calcular ângulos relativos de vento/corrente.
+
+```{r match-buoy}
+buoy_for_match <- buoy_ip |>
+  transmute(
+    datetime,
+    wind_direction_deg    = if ("wind_direction" %in% names(buoy_ip))
+      wind_direction else NA_real_,
+    wind_speed_kmh        = if ("wind_speed" %in% names(buoy_ip))
+      wind_speed * 3.6 else NA_real_,
+    current_direction_deg = current_direction,
+    current_speed_kmh     = current_speed_kmh,
+    wave_height,
+    wave_direction
+  )
+
+matched <- match_buoy_to_segments(fast500, buoy_for_match)
+```
+
+Calcular ângulos relativos de vento/corrente e componentes ao longo do percurso.
+Quando dados de vento não estão disponíveis, são imputados como zero.
+
+```{r apparent}
+conditions <- apparent_conditions(matched, impute_missing_wind = !has_wind)
+```
+
+### Corrente relativa ao rumo
+
+Direção da corrente em relação ao rumo do trecho mais rápido de cada atleta.
+**Topo = corrente a favor** (de popa), **base = corrente contrária** (de proa).
+O raio indica a intensidade da corrente.
+
+```{r current-polar, fig.height = 6, fig.cap = "Corrente relativa ao rumo: topo = a favor, base = contrária. Raio = velocidade da corrente."}
+current_polar <- conditions |>
+  as_tibble() |>
+  filter(!is.na(current_speed_kmh)) |>
+  mutate(
+    current_relative_deg = (current_direction_deg - bearing_deg) %% 360
+  )
+
+current_r_max <- max(5, max(current_polar$current_speed_kmh, na.rm = TRUE))
+
+ggplot(current_polar, aes(x = current_relative_deg, y = current_speed_kmh)) +
+  geom_point(aes(colour = avg_speed_kmh), size = 3) +
+  ggrepel::geom_text_repel(
+    aes(label = fullname_athlete),
+    size = 2.5, max.overlaps = 20
+  ) +
+  coord_polar(start = 0, direction = -1) +
+  scale_x_continuous(
+    limits = c(0, 360),
+    breaks = c(0, 90, 180, 270),
+    labels = c("A favor", "90\u00b0", "Contra", "270\u00b0")
+  ) +
+  scale_y_continuous(limits = c(0, current_r_max)) +
+  scale_colour_viridis_c(option = "plasma", name = "Vel. atleta\n(km/h)") +
+  labs(
+    title    = "Corrente relativa ao rumo do trecho mais rápido",
+    subtitle = "Topo = a favor, base = contrária; cor = velocidade do atleta",
+    x = NULL,
+    y = "Vel. corrente (km/h)"
+  ) +
+  theme_minimal(base_size = 11)
+```
+
+### Vento relativo ao rumo
+
+Mesma lógica aplicada ao vento. **Topo = vento a favor** (de popa),
+**base = vento contrário** (de proa).
+
+```{r wind-polar, eval = has_wind, fig.height = 6, fig.cap = "Vento relativo ao rumo: topo = a favor, base = contrário. Raio = velocidade do vento."}
+wind_polar <- conditions |>
+  as_tibble() |>
+  filter(!is.na(wind_speed_kmh)) |>
+  mutate(
+    wind_relative_deg = (wind_direction_deg + 180 - bearing_deg) %% 360
+  )
+
+wind_r_max <- max(30, max(wind_polar$wind_speed_kmh, na.rm = TRUE))
+
+ggplot(wind_polar, aes(x = wind_relative_deg, y = wind_speed_kmh)) +
+  geom_point(aes(colour = avg_speed_kmh), size = 3) +
+  ggrepel::geom_text_repel(
+    aes(label = fullname_athlete),
+    size = 2.5, max.overlaps = 20
+  ) +
+  coord_polar(start = 0, direction = -1) +
+  scale_x_continuous(
+    limits = c(0, 360),
+    breaks = c(0, 90, 180, 270),
+    labels = c("A favor", "90\u00b0", "Contra", "270\u00b0")
+  ) +
+  scale_y_continuous(limits = c(0, wind_r_max)) +
+  scale_colour_viridis_c(option = "plasma", name = "Vel. atleta\n(km/h)") +
+  labs(
+    title    = "Vento relativo ao rumo do trecho mais rápido",
+    subtitle = "Topo = a favor, base = contrário; cor = velocidade do atleta",
+    x = NULL,
+    y = "Vel. vento (km/h)"
+  ) +
+  theme_minimal(base_size = 11)
+```
+
+```{r wind-polar-missing, eval = !has_wind, results = "asis"}
+cat("**Sem dados de vento disponíveis.** Gráfico polar de vento omitido.\n")
+```
+
+## 7 -- Classificação
+
+```{r league}
+league <- build_league_table(conditions, athlete_col = "fullname_athlete")
+league_fmt <- format_league(league, top_n = 15)
+
+league_fmt |>
+  select(
+    rank, fullname_athlete, predicted_time_fmt, avg_speed_kmh,
+    wind_class, wind_component_kmh,
+    current_class, current_component_kmh
+  ) |>
+  mutate(
+    avg_speed_kmh         = round(avg_speed_kmh, 1),
+    wind_component_kmh    = round(wind_component_kmh, 1),
+    current_component_kmh = round(current_component_kmh, 1)
+  ) |>
+  knitr::kable(
+    col.names = c(
+      "Pos.", "Atleta", "Tempo", "Vel. (km/h)",
+      "Vento", "Vento (km/h)", "Corrente", "Corrente (km/h)"
+    ),
+    caption = paste("Classificação: 500 m mais rápidos em", date_short)
+  )
+```
+
+## 8 -- Resumo do treino
+
+```{r summary-stats, results = "asis"}
+current_summary <- buoy_current |>
+  summarise(
+    mean_speed = round(mean(current_speed_kmh, na.rm = TRUE), 2),
+    max_speed  = round(max(current_speed_kmh, na.rm = TRUE), 2),
+    mean_dir   = round(mean(current_direction, na.rm = TRUE), 0)
+  )
+
+winner      <- league_fmt$fullname_athlete[1]
+winner_time <- league_fmt$predicted_time_fmt[1]
+winner_kmh  <- round(league_fmt$avg_speed_kmh[1], 1)
+
+if (has_wind) {
+  wind_summary <- buoy_wind |>
+    summarise(
+      mean_speed = round(mean(wind_speed_kmh, na.rm = TRUE), 1),
+      max_speed  = round(max(wind_speed_kmh, na.rm = TRUE), 1),
+      mean_dir   = round(mean(wind_direction, na.rm = TRUE), 0)
+    )
+  wind_line <- sprintf(
+    "- **Vento:** média %s km/h (máx %s), predominante de %s°",
+    wind_summary$mean_speed, wind_summary$max_speed, wind_summary$mean_dir
+  )
+} else {
+  wind_line <- "- **Vento:** sem dados disponíveis (imputado como zero)"
+}
+
+cat(sprintf(
+  "**Resumo do treino:**\n\n
+- **Data:** %s
+- **Atletas na água:** %d
+%s
+- **Corrente:** média %s km/h (máx %s), fluindo para %s°
+- **500 m mais rápido:** %s em %s (%s km/h)\n",
+  date_label,
+  n_paddlers,
+  wind_line,
+  current_summary$mean_speed, current_summary$max_speed, current_summary$mean_dir,
+  winner, winner_time, winner_kmh
+))
+```

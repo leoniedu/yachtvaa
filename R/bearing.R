@@ -35,23 +35,33 @@ angle_between <- function(bearing_from, bearing_to) {
 #'
 #' Wind direction uses meteorological convention: direction wind blows FROM.
 #' A wind FROM the same direction the vessel is heading means headwind.
+#' When `wind_speed` is provided and equals zero, the class is `"calm"`.
 #'
 #' @param vessel_bearing Vessel heading in degrees \[0, 360).
 #' @param wind_direction Wind direction (FROM) in degrees \[0, 360).
+#' @param wind_speed Optional numeric vector of wind speeds. When zero, the
+#'   classification is `"calm"` regardless of direction.
 #' @return A list with:
 #'   - `angle_deg`: absolute angle (0 = headwind, 180 = tailwind)
-#'   - `class`: one of "headwind", "tailwind", "crosswind_left", "crosswind_right"
+#'   - `class`: one of `"calm"`, `"headwind"`, `"tailwind"`,
+#'     `"crosswind_left"`, `"crosswind_right"`
 #' @export
-classify_wind_angle <- function(vessel_bearing, wind_direction) {
-
+classify_wind_angle <- function(vessel_bearing, wind_direction,
+                                wind_speed = NULL) {
   # Wind blows FROM wind_direction, so it arrives at the vessel from that
-
   # direction. The angle between vessel heading and wind source tells us
   # if it's a headwind (same direction) or tailwind (opposite).
   angle <- angle_between(vessel_bearing, wind_direction)
   abs_angle <- abs(angle)
 
+  is_calm <- if (!is.null(wind_speed)) {
+    wind_speed == 0
+  } else {
+    rep(FALSE, length(abs_angle))
+  }
+
   class <- dplyr::case_when(
+    is_calm ~ "calm",
     abs_angle <= 45 ~ "headwind",
     abs_angle >= 135 ~ "tailwind",
     angle > 0 ~ "crosswind_right",

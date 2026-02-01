@@ -22,3 +22,13 @@ DEFAULT_DISTANCES_M <- c(100, 500, 1000)
 #' Padding (seconds) added to buoy data fetch window around session times
 #' @noRd
 BUOY_TIME_PAD_SEC <- 3600L
+
+#' Study-area bounding box around SIMCOSTA buoy 515 / Salvador, Bahia (WGS84)
+#' Approx 16 km x 22 km covering Todos os Santos Bay entrance
+#' @noRd
+BBOX_SSA <- c(
+  xmin = -38.61380,
+  ymin = -13.00741,
+  xmax = -38.46308,
+  ymax = -12.81308
+)

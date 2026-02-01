@@ -6,14 +6,18 @@
 #'
 #' Given a vessel bearing and meteorological wind direction (FROM convention),
 #' computes the relative angle and classifies wind as headwind, tailwind, or
-#' crosswind.
+#' crosswind. When `wind_speed` is provided and equals zero, the class is
+#' set to `"calm"` regardless of direction.
 #'
 #' @param vessel_bearing Numeric vector of vessel headings in degrees \[0, 360).
 #' @param wind_direction Numeric vector of wind directions (FROM) in degrees.
+#' @param wind_speed Optional numeric vector of wind speeds. When zero, the
+#'   classification is `"calm"`.
 #' @return A tibble with columns `wind_angle_deg` and `wind_class`.
 #' @export
-relative_wind <- function(vessel_bearing, wind_direction) {
-  result <- classify_wind_angle(vessel_bearing, wind_direction)
+relative_wind <- function(vessel_bearing, wind_direction, wind_speed = NULL) {
+  result <- classify_wind_angle(vessel_bearing, wind_direction,
+                                wind_speed = wind_speed)
   tibble::tibble(
     wind_angle_deg = result$angle_deg,
     wind_class = result$class
@@ -69,7 +73,8 @@ relative_current <- function(vessel_bearing, current_direction) {
 apparent_conditions <- function(segments, impute_missing_wind = FALSE) {
   segments <- .maybe_impute_wind(segments, impute_missing_wind)
 
-  wind_rel <- relative_wind(segments$bearing_deg, segments$wind_direction_deg)
+  wind_rel <- relative_wind(segments$bearing_deg, segments$wind_direction_deg,
+                            wind_speed = segments$wind_speed_kmh)
   current_rel <- relative_current(
     segments$bearing_deg,
     segments$current_direction_deg

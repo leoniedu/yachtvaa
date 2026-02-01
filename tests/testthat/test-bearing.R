@@ -69,9 +69,23 @@ test_that("classify_wind_angle identifies crosswind correctly", {
   expect_equal(result$class, "crosswind_left")
 })
 
+test_that("classify_wind_angle returns calm when wind_speed is zero", {
+  result <- classify_wind_angle(0, 0, wind_speed = 0)
+  expect_equal(result$class, "calm")
+
+  result <- classify_wind_angle(0, 180, wind_speed = 0)
+  expect_equal(result$class, "calm")
+})
+
 test_that("classify_wind_angle is vectorized", {
   result <- classify_wind_angle(c(0, 0, 0), c(0, 180, 90))
   expect_equal(result$class, c("headwind", "tailwind", "crosswind_right"))
+})
+
+test_that("classify_wind_angle vectorized with wind_speed", {
+  result <- classify_wind_angle(c(0, 0, 0), c(0, 180, 90),
+                                wind_speed = c(0, 10, 5))
+  expect_equal(result$class, c("calm", "tailwind", "crosswind_right"))
 })
 
 test_that("classify_current_angle identifies following current", {

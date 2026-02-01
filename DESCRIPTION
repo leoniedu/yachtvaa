@@ -35,6 +35,8 @@ Suggests:
     forcats,
     ggplot2,
     ggrepel,
+    maptiles,
+    tidyterra,
     gridExtra,
     knitr,
     rmarkdown,

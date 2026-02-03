@@ -3,14 +3,11 @@ title: "`r format(as.Date(params$date), 'Treino: %d/%m/%Y')`"
 subtitle: "Yacht Club da Bahia -- Desempenho dos Remadores vs. Vento e Corrente"
 output:
   html_document:
-    toc: true
-    toc_float: true
     theme: flatly
-    code_folding: show
 params:
   date: "2026-01-31"
   start_time: "01:00"
-  end_time: "23:00"
+  end_time: "10:00"
   athlete_ids: !expr 1:70
   cache: true
 ---
@@ -19,6 +16,7 @@ params:
 Sys.setlocale("LC_CTYPE", "en_US.UTF-8")
 Sys.setlocale("LC_TIME", "pt_BR.UTF-8")
 knitr::opts_chunk$set(
+  echo       = FALSE,
   collapse   = TRUE,
   comment    = "#>",
   fig.width  = 8,
@@ -34,11 +32,7 @@ date_long     <- format(session_date, "%d de %B de %Y")
 date_short    <- format(session_date, "%d %b %Y")
 ```
 
-Treino de **`r date_long`** -- GPS via Treinus, boia SIMCOSTA 515. Trechos mais rápidos de 500 m vs. vento e corrente.
-
-## 1 -- Pacotes
-
-```{r packages}
+```{r packages, include = FALSE}
 library(yachtvaa)
 library(dplyr)
 library(tidyr)
@@ -48,13 +42,7 @@ library(patchwork)
 library(lubridate)
 ```
 
-## 2 -- Aquisição de dados
-
-Baixa os registros GPS dos remadores e os dados da boia SIMCOSTA 515 em uma
-única chamada. Com `cache = TRUE` os dados são lidos do disco sem necessidade
-de autenticação.
-
-```{r download}
+```{r download, include = FALSE}
 if (!params$cache) {
  session <- treinusr::treinus_auth()
 }
@@ -107,12 +95,7 @@ records_sf_bbox <- records_sf[
 # 4. Aplicamos pós-filtro no fast500 para garantir início/fim dos segmentos dentro da bbox
 ```
 
-## 3 -- Quem estava na água?
-
-Nem todo atleta retornado pelo Treinus realmente remou -- alguns podem ter
-registros GPS breves em terra.
-Mantemos apenas atletas com **pelo menos 100 pontos GPS** e percurso
-acumulado **superior a 200 m**.
+### Atletas
 
 ```{r identify-paddlers}
 track_summary <- records_sf |>
@@ -164,10 +147,15 @@ paddlers |>
     speed_kmh = "Vel. (km/h)"
   ) |>
   gt::tab_caption("Atletas identificados na água") |>
-  gt::opt_interactive()
+  gt::tab_options(
+    table.font.size = gt::px(12),
+    data_row.padding = gt::px(2),
+    column_labels.padding = gt::px(4)
+  ) |>
+  gt::opt_interactive(page_size_default = 100)
 ```
 
-```{r filter-paddlers}
+```{r filter-paddlers, include = FALSE}
 records_sf <- records_sf |>
   filter(id_athlete %in% paddlers$id_athlete)
 
@@ -213,9 +201,9 @@ fast500 <- fast500 |>
   )
 ```
 
-## 4 -- Mapa dos trechos mais rápidos
+### Mapa
 
-```{r fastest-map, fig.height = 5, fig.cap = "Trechos mais rápidos de 500 m em linha reta. Setas indicam a direção do percurso."}
+```{r fastest-map, fig.height = 8.6, fig.width = 13.8, fig.cap = "Trechos mais rápidos de 500 m em linha reta. Setas indicam a direção do percurso."}
 arrow_df <- fast500 |>
   as_tibble()
 
@@ -253,7 +241,7 @@ ggplot() +
   )
 ```
 
-## 5 -- Condições da boia
+### Boia
 
 ```{r buoy-setup, include = FALSE}
 buoy_ip <- interpolate_buoy(buoy)
@@ -281,10 +269,14 @@ if (has_wind) {
 ```
 
 ```{r buoy-table, echo = FALSE}
-buoy_local <- buoy_ip_training |>
+buoy_local <- buoy_ip |>
   mutate(
     local_time = with_tz(datetime, "America/Bahia"),
     hour = format(floor_date(local_time, "hour"), "%Hh")
+  ) |>
+  filter(
+    datetime >= floor_date(records_time_range[1], "hour") - hours(1),
+    datetime <= ceiling_date(records_time_range[2], "hour") + hours(1)
   )
 
 current_h <- buoy_local |>
@@ -343,15 +335,15 @@ metrics_wide <- metrics_long |>
 metrics_wide |>
   gt::gt() |>
   gt::cols_label(metric = "") |>
-  gt::tab_caption(paste("Boia SIMCOSTA 515 \u2014", date_short))
+  gt::tab_caption(paste("Boia SIMCOSTA 515 \u2014", date_short)) |>
+  gt::tab_options(
+    table.font.size = gt::px(12),
+    data_row.padding = gt::px(2),
+    column_labels.padding = gt::px(4)
+  )
 ```
 
-## 6 -- Condições nos trechos mais rápidos
-
-Associar cada segmento à observação mais próxima da boia via rolling join e
-calcular ângulos relativos de vento/corrente.
-
-```{r match-buoy}
+```{r match-buoy, include = FALSE}
 buoy_for_match <- buoy_ip |>
   transmute(
     datetime,
@@ -368,14 +360,11 @@ buoy_for_match <- buoy_ip |>
 matched <- match_buoy_to_segments(fast500, buoy_for_match)
 ```
 
-Calcular ângulos relativos de vento/corrente e componentes ao longo do percurso.
-Quando dados de vento não estão disponíveis, são imputados como zero.
-
-```{r apparent}
+```{r apparent, include = FALSE}
 conditions <- apparent_conditions(matched, impute_missing_wind = !has_wind)
 ```
 
-**Topo = a favor**, **base = contrário**. Raio = intensidade; cor = velocidade do atleta.
+### Corrente & Vento
 
 ```{r polar-plots, fig.height = 5, fig.width = 14, fig.cap = "Corrente e vento relativos ao rumo do trecho mais rápido."}
 current_polar <- conditions |>
@@ -427,7 +416,7 @@ if (has_wind) {
 }
 ```
 
-## 7 -- Classificação
+### Classificação
 
 ```{r league}
 league <- build_league_table(conditions, athlete_col = "fullname_athlete")
@@ -446,33 +435,34 @@ league_fmt |>
   mutate(
     tempo = sprintf("%d:%02d", floor(predicted_time_sec / 60),
                     round(predicted_time_sec %% 60)),
-    avg_speed_kmh         = round(avg_speed_kmh, 1),
-    wind_class            = wind_class_pt[wind_class],
-    wind_component_kmh    = round(wind_component_kmh, 1),
-    current_class         = current_class_pt[current_class],
-    current_component_kmh = round(current_component_kmh, 1)
+    avg_speed_kmh = round(avg_speed_kmh, 1),
+    vento = paste0(wind_class_pt[wind_class], " (",
+                   round(wind_component_kmh, 1), " km/h)"),
+    corrente = paste0(current_class_pt[current_class], " (",
+                      round(current_component_kmh, 1), " km/h)")
   ) |>
-  select(
-    rank, fullname_athlete, tempo, avg_speed_kmh,
-    wind_class, wind_component_kmh,
-    current_class, current_component_kmh
-  ) |>
+  select(rank, fullname_athlete, tempo, avg_speed_kmh, vento, corrente) |>
   gt::gt() |>
   gt::cols_label(
-    rank = "Pos.",
+    rank = "#",
     fullname_athlete = "Atleta",
     tempo = "Tempo",
-    avg_speed_kmh = "Vel. (km/h)",
-    wind_class = "Vento",
-    wind_component_kmh = "Vento (km/h)",
-    current_class = "Corrente",
-    current_component_kmh = "Corrente (km/h)"
+    avg_speed_kmh = "Velocidade (km/h)",
+    vento = "Vento",
+    corrente = "Corrente"
   ) |>
   gt::tab_caption(paste("Classificação: 500 m mais rápidos em", date_short)) |>
-  gt::opt_interactive()
+  gt::tab_options(
+    table.font.size = gt::px(12),
+    data_row.padding = gt::px(2),
+    column_labels.padding = gt::px(4)
+  ) |>
+  gt::opt_interactive(page_size_default = 100) |>
+  gt::cols_width(fullname_athlete~gt::px(200), rank~gt::px(30), 
+  tempo~gt::px(60), avg_speed_kmh~gt::px(90))
 ```
 
-## 8 -- Resumo do treino
+### Resumo
 
 ```{r summary-stats, results = "asis"}
 current_summary <- buoy_current |>

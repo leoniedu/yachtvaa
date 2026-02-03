@@ -25,7 +25,7 @@ BUOY_TIME_PAD_SEC <- 3600L
 
 #' Study-area bounding box around SIMCOSTA buoy 515 / Salvador, Bahia (WGS84)
 #' Approx 16 km x 22 km covering Todos os Santos Bay entrance
-#' @noRd
+#' @export
 BBOX_SSA <- c(
   xmin = -38.61380,
   ymin = -13.00741,

@@ -1,6 +1,24 @@
 # YachtVAA Session Explorer
 # Interactive analysis of paddler performance vs. environmental conditions
 
+# ===== CRITICAL: Ensure cache directory exists BEFORE loading libraries =====
+# Memoise marks cache as "destroyed" if directory doesn't exist when it initializes
+# MUST happen BEFORE rtreinus is loaded through yachtvaa
+tryCatch({
+  cache_base <- file.path(
+    Sys.getenv("HOME"), "Library/Caches/org.R-project.R/R"
+  )
+  rtreinus_cache <- file.path(cache_base, "rtreinus")
+  memoise_cache <- file.path(rtreinus_cache, "memoise")
+
+  # Ensure directories exist before libraries load
+  if (!dir.exists(memoise_cache)) {
+    dir.create(memoise_cache, recursive = TRUE, showWarnings = FALSE)
+  }
+}, error = function(e) {
+  warning("Could not pre-create cache directory: ", conditionMessage(e))
+})
+
 library(shiny)
 library(bslib)
 library(yachtvaa)
@@ -8,28 +26,6 @@ library(dplyr)
 library(sf)
 library(leaflet)
 library(reactable)
-
-# ===== CRITICAL: Clean rtreinus cache at startup =====
-# This prevents memoise from marking cache as destroyed
-# Must happen before any rtreinus functions are called
-tryCatch({
-  cache_base <- file.path(
-    Sys.getenv("HOME"), "Library/Caches/org.R-project.R/R"
-  )
-  rtreinus_cache <- file.path(cache_base, "rtreinus")
-
-  # Remove the entire rtreinus cache directory to force fresh state
-  if (dir.exists(rtreinus_cache)) {
-    unlink(rtreinus_cache, recursive = TRUE, force = TRUE)
-  }
-
-  # Recreate it empty so memoise can initialize properly
-  dir.create(rtreinus_cache, recursive = TRUE, showWarnings = FALSE)
-  dir.create(file.path(rtreinus_cache, "memoise"),
-             recursive = TRUE, showWarnings = FALSE)
-}, error = function(e) {
-  message("Note: Could not pre-clear rtreinus cache: ", conditionMessage(e))
-})
 
 # Source Shiny modules
 for (f in list.files("R", full.names = TRUE, pattern = "\\.R$")) source(f)

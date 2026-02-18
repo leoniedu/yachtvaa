@@ -24,37 +24,10 @@ BBOX_SSA <- c(
     return(get(cache_key, envir = .exercise_cache))
   }
 
-  # Try to fetch exercises, with retry logic for cache issues
-  result <- tryCatch(
-    {
-      rtreinus::treinus_get_exercises(
-        athlete_id = athlete_id,
-        session = session,
-        use_db = use_db
-      )
-    },
-    error = function(e) {
-      # If we hit a "destroyed cache" error, try clearing and retrying once
-      if (grepl("Attempted to use cache which has been destroyed", conditionMessage(e))) {
-        # Clear caches and retry
-        tryCatch({
-          rtreinus::treinus_clear_memoise()
-          rtreinus::treinus_clear_cache()
-        }, error = function(e2) NULL)
-
-        # Retry the fetch
-        tryCatch(
-          rtreinus::treinus_get_exercises(
-            athlete_id = athlete_id,
-            session = session,
-            use_db = use_db
-          ),
-          error = function(e3) stop(e3)
-        )
-      } else {
-        stop(e)
-      }
-    }
+  result <- rtreinus::treinus_get_exercises(
+    athlete_id = athlete_id,
+    session = session,
+    use_db = use_db
   )
 
   assign(cache_key, result, envir = .exercise_cache)
@@ -64,21 +37,7 @@ BBOX_SSA <- c(
 mod_data_loader_server <- function(id, input, rv) {
   observeEvent(input$load_btn, {
     withProgress(message = "Carregando dados...", value = 0, {
-      # CRITICAL: Ensure cache directories exist before rtreinus accesses them
-      # This prevents memoise from marking cache as "destroyed"
-      tryCatch({
-        cache_dir <- rtreinus::treinus_cache_dir()
-        if (!dir.exists(cache_dir)) {
-          dir.create(cache_dir, recursive = TRUE, showWarnings = FALSE)
-        }
-        # Create memoise subdirectory too
-        memoise_dir <- file.path(cache_dir, "memoise")
-        if (!dir.exists(memoise_dir)) {
-          dir.create(memoise_dir, recursive = TRUE, showWarnings = FALSE)
-        }
-      }, error = function(e) NULL)
-
-      # Clear cache if force refresh is enabled
+      # Clear in-memory cache if force refresh is enabled
       if (isTRUE(input$force_refresh)) {
         rm(list = ls(envir = .exercise_cache), envir = .exercise_cache)
       }
@@ -112,19 +71,8 @@ mod_data_loader_server <- function(id, input, rv) {
 
       # ---------------------------------------------------------------
       # 1) Get exercise lists for all athletes (lightweight metadata)
-      # Cached with 30-minute expiry via memoise
       # ---------------------------------------------------------------
       incProgress(0.1, detail = "Buscando lista de treinos...")
-
-      # Proactively clear rtreinus caches to ensure clean state
-      # (the .get_exercises_cached function will also handle cache issues with retry logic)
-      tryCatch({
-        rtreinus::treinus_clear_memoise()
-        rtreinus::treinus_clear_cache()
-        Sys.sleep(0.1)  # Brief pause to ensure cleanup completes
-      }, error = function(e) NULL  # Silently ignore if functions unavailable
-      )
-
       exercises <- tryCatch(
         {
           # If we have a session from successful auth, use it (will fetch fresh)
@@ -132,37 +80,14 @@ mod_data_loader_server <- function(id, input, rv) {
           has_valid_session <- !is.null(session_treinus)
           use_local_db <- !has_valid_session
 
-          # Try with automatic retry on cache destruction
-          fetch_exercises <- function() {
-            purrr::map(1:70, function(aid) {
-              .get_exercises_cached(
-                athlete_id = aid,
-                session = session_treinus,
-                use_db = use_local_db
-              )
-            }) |>
-              purrr::list_rbind()
-          }
-
-          # First attempt
-          tryCatch(
-            fetch_exercises(),
-            error = function(e) {
-              if (grepl("Attempted to use cache which has been destroyed", conditionMessage(e))) {
-                # Cache destroyed - attempt recovery and retry once
-                tryCatch({
-                  rtreinus::treinus_clear_memoise()
-                  rtreinus::treinus_clear_cache()
-                  Sys.sleep(0.2)
-                }, error = function(e2) NULL)
-
-                # Retry
-                fetch_exercises()
-              } else {
-                stop(e)
-              }
-            }
-          )
+          purrr::map(1:70, function(aid) {
+            .get_exercises_cached(
+              athlete_id = aid,
+              session = session_treinus,
+              use_db = use_local_db
+            )
+          }) |>
+            purrr::list_rbind()
         },
         error = function(e) {
           showNotification(

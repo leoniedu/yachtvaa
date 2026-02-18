@@ -12,7 +12,6 @@ params:
   start_time: "00:00"
   end_time: "15:00"
   athlete_id: 50
-  cache: false
 ---
 
 ```{r setup, include = FALSE}
@@ -43,16 +42,13 @@ library(lubridate)
 ```
 
 ```{r load-data, include = FALSE}
-if (!params$cache) {
-  session <- treinusr::treinus_auth()
-}
+session <- rtreinus::treinus_auth()
 raw <- fetch_session_data(
-  session     = if (params$cache) NULL else session,
+  session     = session,
   date        = params$date,
   start_time  = params$start_time,
   end_time    = params$end_time,
-  athlete_ids = params$athlete_id,
-  cache       = params$cache
+  athlete_ids = params$athlete_id
 )
 
 records <- raw$records

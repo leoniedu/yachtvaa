@@ -23,6 +23,12 @@ DEFAULT_DISTANCES_M <- c(100, 500, 1000)
 #' @noRd
 BUOY_TIME_PAD_SEC <- 3600L
 
+#' SIMCOSTA buoy 515 location (WGS84): 12 59'23.91"S, 38 32'29.28"W
+#' @noRd
+BUOY_515_LON <- -38.5415
+#' @noRd
+BUOY_515_LAT <- -12.9900
+
 #' Study-area bounding box around SIMCOSTA buoy 515 / Salvador, Bahia (WGS84)
 #' Approx 16 km x 22 km covering Todos os Santos Bay entrance
 #' @export

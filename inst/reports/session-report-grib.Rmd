@@ -2,26 +2,26 @@
 title: "`r format(as.Date(params$date), 'Resumo do Treino de %d/%m/%Y')`"
 subtitle: "Yacht Club da Bahia -- Desempenho vs. Corrente e Vento"
 output:
-  html_document:
-    theme: flatly
+  html_document
 params:
-  date: "2026-02-03"
-  start_time: "01:00"
-  end_time: "10:00"
+  date: "2026-01-24"
+  start_time: "05:00"
+  end_time: "23:00"
   athlete_ids: !expr 1:70
-  cache: true
-
+  length_m: 1000
 ---
 
 ```{r setup, include = FALSE}
+##packages <- c("~/github/yachtvaa/", "~/github/rsimcosta/", "~/github/rtreinus/", "~/github/rsiscorar/"); lapply(packages, devtools::document); lapply(packages, devtools::install)
+
 Sys.setlocale("LC_CTYPE", "en_US.UTF-8")
 Sys.setlocale("LC_TIME", "pt_BR.UTF-8")
 knitr::opts_chunk$set(
   echo       = FALSE,
   collapse   = TRUE,
   comment    = "#>",
-  fig.width  = 8,
-  fig.height = 5,
+  fig.width  = 32,
+  fig.height = 20,
   dpi        = 150,
   warning    = FALSE,
   message    = FALSE
@@ -45,27 +45,24 @@ library(terra)
 ```
 
 ```{r download, include = FALSE}
-if (!params$cache) {
- session <- treinusr::treinus_auth()
-}
-use_cache <- params$cache
+session <- rtreinus::treinus_auth()
 raw <- fetch_session_data(
-  session = session,
+  session     = session,
   date        = params$date,
   start_time  = params$start_time,
   end_time    = params$end_time,
-  athlete_ids = params$athlete_ids,
-  cache       = use_cache,
-  overwrite_db=!use_cache,
-  use_memoise=FALSE
+  athlete_ids = params$athlete_ids
 )
 
 records <- raw$records |>
-  mutate(fullname_athlete = capitalizar(fullname_athlete))
+  mutate(fullname_athlete = capitalizar(fullname_athlete)) 
+
 buoy    <- raw$buoy
 
 # Filtro espacial
-records_sf <- records_to_sf(records)
+records_sf <- records_to_sf(records) |>
+  ## fix tz for athlete 50 (FIX: where can we get tz??)|>
+  mutate(timestamp=if_else(id_athlete==50, timestamp+(60*60*3), timestamp))
 study_area <- sf::st_bbox(
   c(xmin = -38.61380, ymin = -13.00741,
     xmax = -38.46308, ymax = -12.81308),
@@ -88,15 +85,13 @@ records_sf_bbox <- records_sf[
 
 ```{r grib-read, include = FALSE}
 # Read SISCORAR ocean current model (U and V components, hourly)
-cache_grib <- TRUE
-grib_path <- "~/tmp/tmp.grib2"
-if (!cache_grib) { 
-library(rsiscorar)
-siscorar <- rsiscorar::predict_currents(date = params$date, area = "baiatos", daylight_saving = FALSE)
-write_grib(siscorar, normalizePath(grib_path), hours = 0:23, resolution = 0.001)
-  }
+# Create cache system for rsiscorar data
+area <- "baiatos"  # Using the area from the original call
+date_str <- gsub("-", "", params$date)  # Format date as YYYYMMDD
+hours_str <- paste(0:23, collapse = "-")  # Hours as string
 
-grib <- terra::rast(grib_path)
+library(rsiscorar)
+grib <- rsiscorar::get_grib(date = params$date, area = area, resolution = 0.001)
 
 # Identify U and V layers from names
 layer_names <- names(grib)
@@ -211,11 +206,13 @@ paddlers |>
     track_distance_km = round(track_distance_m / 1000, 1),
     duration_fmt = sprintf("%d:%02d", floor(duration_min / 60), round(duration_min %% 60)),
     speed_kmh = round((track_distance_m / duration_min) * 60 / 1000, 1),
-    first_fix=format.Date(first_fix, "%H:%M")
+    first_fix=format.Date(lubridate::with_tz(first_fix, "America/Recife"), "%H:%M")
   ) |>
-  select(fullname_athlete, first_fix, duration_fmt, track_distance_km, speed_kmh) |>
+  select(id_athlete, fullname_athlete, first_fix, duration_fmt, track_distance_km, speed_kmh) |>
+  arrange(desc(speed_kmh)) |>
   gt::gt() |>
   gt::cols_label(
+id_athlete = "Treinus ID", 
     fullname_athlete = "Atleta",
     first_fix = "Início",
     duration_fmt = "Duração (h:mm)",
@@ -238,22 +235,22 @@ records_sf <- records_sf |>
 n_paddlers <- nrow(paddlers)
 ```
 
-```{r fastest-500, include = FALSE}
-fast500 <- fastest_straight_distance(
+```{r fastest-x, include = FALSE}
+fastx <- fastest_straight_distance(
   records_sf_bbox,
   athlete_col = "id_athlete",
   time_col    = "timestamp",
-  distance_m  = 500
+  distance_m  = params$length_m
 )
 
-if (nrow(fast500) > 0) {
+if (nrow(fastx) > 0) {
   start_points <- sf::st_as_sf(
-    fast500,
+    fastx,
     coords = c("start_x", "start_y"),
     crs = sf::st_crs(records_sf)
   )
   end_points <- sf::st_as_sf(
-    fast500,
+    fastx,
     coords = c("end_x", "end_y"),
     crs = sf::st_crs(records_sf)
   )
@@ -261,10 +258,10 @@ if (nrow(fast500) > 0) {
   start_in_bbox <- lengths(sf::st_intersects(start_points, study_area)) > 0
   end_in_bbox <- lengths(sf::st_intersects(end_points, study_area)) > 0
 
-  fast500 <- fast500[start_in_bbox & end_in_bbox, ]
+  fastx <- fastx[start_in_bbox & end_in_bbox, ]
 }
 
-fast500 <- fast500 |>
+fastx <- fastx |>
   left_join(
     paddlers |> select(id_athlete, fullname_athlete),
     by = "id_athlete"
@@ -273,8 +270,8 @@ fast500 <- fast500 |>
 
 ### Mapa
 
-```{r fastest-map, fig.height = 8.6, fig.width = 13.8, fig.cap = "Trechos mais rápidos de 500 m em linha reta. Setas indicam a direção do percurso."}
-arrow_df <- fast500 |>
+```{r fastest-map, fig.height = 8.6, fig.width = 13.8, fig.cap = "Trechos mais rápidos de X m em linha reta. Setas indicam a direção do percurso."}
+arrow_df <- fastx |>
   as_tibble()
 
 basemap <- maptiles::get_tiles(records_sf, provider = "CartoDB.Positron",
@@ -285,7 +282,7 @@ basemap <- maptiles::get_tiles(records_sf, provider = "CartoDB.Positron",
 
 
 
-```{r current-field, fig.height = 8.6, fig.width = 13.8, fig.cap = "Campo de correntes oceânicas SISCORAR. Setas indicam direção e intensidade."}
+```{r current-field, fig.height = 8.6, fig.width = 8.8, fig.cap = "Campo de correntes oceânicas SISCORAR. Setas indicam direção e intensidade."}
 # Representative hour: median of training period
 med_hour_utc <- as.numeric(format(
   median(records_sf$timestamp), "%H", tz = "UTC"
@@ -321,12 +318,6 @@ local_hour <- format(
   with_tz(grib_times[med_hour_idx], "America/Bahia"), "%Hh"
 )
 
-
-```
-
-
-
-```{r}
 ggplot() +
   tidyterra::geom_spatraster_rgb(data = basemap) +
 
@@ -382,7 +373,7 @@ ggplot() +
   coord_sf(crs = sf::st_crs(records_sf)) +
 
   labs(
-    title    = "Trechos mais rápidos (500 m) e campo de correntes",
+    title    = paste0("Trechos mais rápidos (", params$length_m, "m) e campo de correntes"),
     subtitle = paste0(
       "Setas grossas = atletas | Setas finas = corrente (",
       local_hour, ")"
@@ -520,8 +511,8 @@ metrics_wide |>
 
 ```{r match-grib, include = FALSE}
 # Extract GRIB current at each segment's midpoint and nearest hour
-mid_x <- (fast500$start_x + fast500$end_x) / 2
-mid_y <- (fast500$start_y + fast500$end_y) / 2
+mid_x <- (fastx$start_x + fastx$end_x) / 2
+mid_y <- (fastx$start_y + fastx$end_y) / 2
 
 mid_pts <- sf::st_as_sf(
   tibble::tibble(x = mid_x, y = mid_y),
@@ -533,7 +524,7 @@ mid_pts <- sf::st_as_sf(
 mid_vect <- terra::vect(mid_pts)
 
 # Find nearest GRIB hour for each segment
-seg_hour_utc <- as.numeric(format(fast500$start_time, "%H", tz = "UTC"))
+seg_hour_utc <- as.numeric(format(fastx$start_time, "%H", tz = "UTC"))
 seg_hour_idx <- pmin(pmax(seg_hour_utc, 0), n_hours - 1) + 1
 
 # Extract U and V from cropped study layers at all midpoints
@@ -541,7 +532,7 @@ u_all <- as.matrix(terra::extract(u_study, mid_vect))
 v_all <- as.matrix(terra::extract(v_study, mid_vect))
 
 # Column 1 is ID; columns 2:(n_hours+1) are hours 0:(n_hours-1)
-row_idx <- seq_len(nrow(fast500))
+row_idx <- seq_len(nrow(fastx))
 col_idx <- seg_hour_idx + 1L  # +1 for the ID column
 
 u_vals <- u_all[cbind(row_idx, col_idx)]
@@ -572,8 +563,8 @@ if (any(na_mask)) {
 }
 
 # Convert U,V (m/s) to speed (km/h) and direction (TO convention, degrees)
-fast500$current_speed_kmh     <- sqrt(u_vals^2 + v_vals^2) * 3.6
-fast500$current_direction_deg <- (atan2(u_vals, v_vals) * 180 / pi) %% 360
+fastx$current_speed_kmh     <- sqrt(u_vals^2 + v_vals^2) * 3.6
+fastx$current_direction_deg <- (atan2(u_vals, v_vals) * 180 / pi) %% 360
 
 # Add wind + buoy current from SIMCOSTA via rolling time-join
 buoy_for_match <- buoy_ip |>
@@ -589,7 +580,7 @@ buoy_for_match <- buoy_ip |>
       current_speed_kmh else NA_real_
   )
 
-matched <- match_buoy_to_segments(fast500, buoy_for_match)
+matched <- match_buoy_to_segments(fastx, buoy_for_match)
 ```
 
 ```{r apparent, include = FALSE}
@@ -693,7 +684,7 @@ wrap_plots(panels, ncol = length(panels)) +
   theme(legend.position = "bottom")
 ```
 
-### Classificação: 500m mais rápidos
+### Classificação: `r params$length_m`m mais rápidos
 
 ```{r league}
 league <- build_league_table(conditions, athlete_col = "fullname_athlete")
@@ -728,8 +719,8 @@ cols_label <- list(
   rank = "#", fullname_athlete = "Atleta", 
   inicio="Início",
   tempo = "Tempo",
-  avg_speed_kmh = "Velocidade (km/h)", vento = "Vento",
-  corrente_siscorar = "Corrente SISCORAR"
+  avg_speed_kmh = "Velocidade (km/h)", vento = "Comp. Vento",
+  corrente_siscorar = "Comp. Corrente (SISCORAR)"
 )
 
 if (has_buoy_current &&
@@ -740,14 +731,14 @@ if (has_buoy_current &&
                              round(buoy_current_component_kmh, 1), " km/h)")
     )
   cols_select <- c(cols_select, "corrente_boia")
-  cols_label$corrente_boia <- "Corrente Boia"
+  cols_label$corrente_boia <- "Comp. Corrente (Boia)"
 }
 
 league_tbl |>
   select(all_of(cols_select)) |>
   gt::gt() |>
   gt::cols_label(!!!cols_label) |>
-  gt::tab_caption(paste("Classificação: 500 m mais rápidos em", date_short)) |>
+  gt::tab_caption(paste("Classificação: ", params$length_m, "m mais rápidos em", date_short)) |>
   gt::tab_options(
     table.font.size = gt::px(12),
     data_row.padding = gt::px(2),
@@ -755,7 +746,8 @@ league_tbl |>
   ) |>
   gt::opt_interactive(page_size_default = 100) |>
   gt::cols_width(fullname_athlete~gt::px(200), rank~gt::px(30),
-  tempo~gt::px(60), avg_speed_kmh~gt::px(90))
+  tempo~gt::px(60), avg_speed_kmh~gt::px(90)) |>
+    gt::tab_footnote("Os componentes (vento/corrente) são calculados como Velocidade * cos(ângulo canoa vs corrente/vento). Medem, portanto, a intensidade do vento ou corrente na direção seguida pela canoa.")
 ```
 
 ### Resumo
@@ -809,7 +801,7 @@ current_match_line <- if (exists("na_mask") && any(na_mask)) {
 } else {
   sprintf(
     "- **SISCORAR por trecho:** %d/%d extraídos diretamente",
-    nrow(fast500), nrow(fast500)
+    nrow(fastx), nrow(fastx)
   )
 }
 
@@ -836,7 +828,7 @@ cat(sprintf(
 - **Duração média:** %s (h:mm)
 %s
 %s
-- **500 m mais rápido:** %s em %s (%s km/h)\n",
+- **%sm mais rápido:** %s em %s (%s km/h)\n",
   date_label,
   n_paddlers,
   avg_dur_fmt,
@@ -844,6 +836,7 @@ cat(sprintf(
   #grib_summary$mean_speed, #grib_summary$max_speed, mean_current_dir,
   buoy_current_line,
   #current_match_line,
+  params$length_m,
   winner, winner_time, winner_kmh
 ))
 ```

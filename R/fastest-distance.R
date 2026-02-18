@@ -11,7 +11,7 @@
 # Tracks are automatically split when consecutive timestamps
 # differ by more than `max_gap` seconds (default = 20).
 #
-# Ported from treinusr with improvements:
+# Ported from rtreinus with improvements:
 #   - Proper sf:: namespace (no library(sf))
 #   - data.table column access without get()
 #   - Empty data.table on no results (not string)

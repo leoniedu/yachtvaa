@@ -9,7 +9,6 @@ params:
   start_time: "01:00"
   end_time: "10:00"
   athlete_ids: !expr 1:70
-  cache: true
 ---
 
 ```{r setup, include = FALSE}
@@ -43,22 +42,16 @@ library(lubridate)
 ```
 
 ```{r download, include = FALSE}
-if (!params$cache) {
- session <- treinusr::treinus_auth()
-}
-use_cache <- params$cache
+session <- rtreinus::treinus_auth()
 raw <- fetch_session_data(
-  session = session,
+  session     = session,
   date        = params$date,
   start_time  = params$start_time,
   end_time    = params$end_time,
-  athlete_ids = params$athlete_ids,
-  cache       = use_cache,
-  overwrite_db=!use_cache,
-  use_memoise=FALSE
+  athlete_ids = params$athlete_ids
 )
 
-records <- raw$records%>%
+records <- raw$records |>
   mutate(fullname_athlete = tolower(fullname_athlete))
 buoy    <- raw$buoy
 

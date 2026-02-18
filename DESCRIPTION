@@ -26,22 +26,33 @@ Imports:
     rlang (>= 1.1.0),
     sf,
     simcostar,
+    terra,
     tibble,
-    treinusr,
+    tidyr,
+    rtreinus,
     zoo
 Suggests:
+    bslib (>= 0.7.0),
     testthat (>= 3.0.0),
     withr,
     forcats,
     ggplot2,
     ggrepel,
+    ggnewscale,
+    leaflet,
+    leaflet.extras2,
     maptiles,
+    patchwork,
+    plotly,
+    reactable,
+    rsiscorar,
+    shiny (>= 1.8.0),
     tidyterra,
     gridExtra,
     knitr,
     rmarkdown,
     scales
 Remotes:
-    leoniedu/treinusr,
-    leoniedu/simcostar
+    leoniedu/rtreinus,
+    leoniedu/rsimcosta
 Config/testthat/edition: 3

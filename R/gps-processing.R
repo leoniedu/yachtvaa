@@ -4,7 +4,7 @@
 
 #' Convert GPS records to projected sf points
 #'
-#' Takes a data frame of GPS records (from treinusr) and converts to an sf
+#' Takes a data frame of GPS records (from rtreinus) and converts to an sf
 #' object projected to a planar CRS. Handles both decimal degree coordinates
 #' and Garmin/ANT+ semicircle format.
 #'

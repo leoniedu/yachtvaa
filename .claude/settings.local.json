@@ -13,7 +13,22 @@
       "Bash(git branch:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(gh repo create:*)"
+      "Bash(gh repo create:*)",
+      "Bash(git push)",
+      "Bash(for area in guanabara sepetiba paranagua santos baiatos)",
+      "Bash(do echo \"=== $area ===\")",
+      "Bash(done)",
+      "Bash(file:*)",
+      "Bash(ls:*)",
+      "Bash(gh repo rename:*)",
+      "Bash(R --vanilla --slave --silent -e:*)",
+      "Bash(timeout 10 R:*)",
+      "Bash(timeout 30 R:*)",
+      "Bash(R:*)",
+      "Bash(1:*)",
+      "Bash(curl:*)",
+      "Bash(env:*)",
+      "Bash(pkill:*)"
     ]
   }
 }

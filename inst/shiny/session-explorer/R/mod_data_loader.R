@@ -15,8 +15,8 @@ BBOX_SSA <- c(
 # Simple in-memory cache (avoid disk cache issues)
 .exercise_cache <- new.env(hash = TRUE, parent = emptyenv())
 
-.get_exercises_cached <- function(athlete_id, session = NULL, use_db = FALSE) {
-  cache_key <- paste0("athlete_", athlete_id)
+.get_exercises_cached <- function(athlete_id, session = NULL, use_db = TRUE) {
+  cache_key <- paste0("athlete_", athlete_id, if (use_db) "_db" else "_api")
 
   if (exists(cache_key, envir = .exercise_cache, inherits = FALSE)) {
     return(get(cache_key, envir = .exercise_cache))
@@ -40,19 +40,13 @@ mod_data_loader_server <- function(id, input, rv) {
         rm(list = ls(envir = .exercise_cache), envir = .exercise_cache)
       }
 
-      # Auth: always authenticate; force_refresh only clears the in-memory cache
+      # Auth: try live session; fall back to local DB if auth fails
       incProgress(0.05, detail = "Autenticando...")
       session_treinus <- tryCatch(
         rtreinus::treinus_auth(),
-        error = function(e) {
-          showNotification(
-            paste("Erro de autentica\u00e7\u00e3o:", conditionMessage(e)),
-            type = "error",
-            duration = 10
-          )
-          NULL
-        }
+        error = function(e) NULL  # silently fall back to use_db = TRUE
       )
+      use_local_db <- is.null(session_treinus)
 
       # Convert input$date to proper Date
       the_date <- as.Date(input$date, origin = "1970-01-01")
@@ -68,7 +62,7 @@ mod_data_loader_server <- function(id, input, rv) {
             .get_exercises_cached(
               athlete_id = aid,
               session = session_treinus,
-              use_db = FALSE
+              use_db = use_local_db
             )
           }) |>
             purrr::list_rbind()

@@ -298,7 +298,7 @@ server <- function(input, output, session) {
   # ---------------------------
   # Module servers
   # ---------------------------
-  mod_summary_server("summary", rv)
+  mod_summary_server("summary", rv, reactive(input$selected_athletes))
   mod_track_map_server("track_map", rv)
   mod_conditions_table_server("conditions", rv)
   mod_polar_plots_server("polars", rv)

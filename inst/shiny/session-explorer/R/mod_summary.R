@@ -39,22 +39,21 @@ mod_summary_ui <- function(id) {
   )
 }
 
-mod_summary_server <- function(id, rv) {
+mod_summary_server <- function(id, rv, selected_athletes) {
   shiny::moduleServer(id, function(input, output, session) {
 
     output$n_paddlers <- shiny::renderText({
-      req(rv$paddlers, input$selected_athletes)
-      length(input$selected_athletes)
+      req(rv$paddlers, selected_athletes())
+      length(selected_athletes())
     })
 
     output$avg_duration <- shiny::renderText({
-      req(rv$paddlers, input$selected_athletes)
-      sel_ids <- as.integer(input$selected_athletes)
+      req(rv$paddlers, selected_athletes())
+      sel_ids <- as.integer(selected_athletes())
       avg <- mean(
         rv$paddlers[rv$paddlers$id_athlete %in% sel_ids, ]$duration_min,
         na.rm = TRUE
       )
-      # Handle cases where avg is NA or infinite
       if (is.na(avg) || !is.finite(avg)) return("--")
       sprintf("%d:%02d", floor(avg / 60), round(avg %% 60))
     })
@@ -83,10 +82,9 @@ mod_summary_server <- function(id, rv) {
     })
 
     output$paddler_table <- reactable::renderReactable({
-      req(rv$paddlers, input$selected_athletes)
+      req(rv$paddlers, selected_athletes())
 
-      # Filter to only selected athletes
-      sel_ids <- as.integer(input$selected_athletes)
+      sel_ids <- as.integer(selected_athletes())
       tbl <- rv$paddlers |>
         dplyr::filter(id_athlete %in% sel_ids) |>
         dplyr::arrange(dplyr::desc(track_distance_m)) |>

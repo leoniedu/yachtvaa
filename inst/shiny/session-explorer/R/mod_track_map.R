@@ -34,15 +34,16 @@ mod_track_map_ui <- function(id) {
   )
 }
 
-mod_track_map_server <- function(id, rv) {
+mod_track_map_server <- function(id, rv, selected_athletes) {
   shiny::moduleServer(id, function(input, output, session) {
 
     # Build track lines per athlete (WGS84)
     tracks_data <- shiny::reactive({
-      req(rv$records_sf, rv$paddlers)
+      req(rv$records_sf, rv$paddlers, selected_athletes())
+      sel_ids <- as.integer(selected_athletes())
 
       recs <- rv$records_sf |>
-        dplyr::filter(id_athlete %in% rv$paddlers$id_athlete) |>
+        dplyr::filter(id_athlete %in% sel_ids) |>
         dplyr::arrange(id_athlete, timestamp) |>
         sf::st_transform(4326)
 
@@ -74,9 +75,10 @@ mod_track_map_server <- function(id, rv) {
 
     # Time range for animation
     time_range <- shiny::reactive({
-      req(rv$records_sf, rv$paddlers)
+      req(rv$records_sf, selected_athletes())
+      sel_ids <- as.integer(selected_athletes())
       recs <- rv$records_sf |>
-        dplyr::filter(id_athlete %in% rv$paddlers$id_athlete)
+        dplyr::filter(id_athlete %in% sel_ids)
       range(recs$timestamp)
     })
 

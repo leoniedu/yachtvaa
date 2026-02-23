@@ -55,7 +55,7 @@ ui <- page_navbar(
     ),
     sliderInput(
       "time_range", "Hor\u00e1rio",
-      min = 5, max = 23, value = c(5, 12),
+      min = 0, max = 23, value = c(0, 23),
       step = 1, post = "h"
     ),
     checkboxInput(
@@ -190,6 +190,12 @@ server <- function(input, output, session) {
     analysis_trigger(analysis_trigger() + 1)
   }, ignoreInit = TRUE)
 
+  # Auto-trigger when time range changes
+  observeEvent(input$time_range, {
+    req(rv$paddlers)
+    analysis_trigger(analysis_trigger() + 1)
+  }, ignoreInit = TRUE)
+
   # ---------------------------
   # Phase 2: Analysis pipeline
   # ---------------------------
@@ -202,8 +208,21 @@ server <- function(input, output, session) {
 
     withProgress(message = "Analisando...", value = 0, {
 
-      # Filter records to selected athletes
-      recs <- rv$records_sf_bbox[rv$records_sf_bbox$id_athlete %in% sel_ids, ]
+      # Filter records to selected athletes and time range
+      start_t <- as.POSIXct(
+        sprintf("%s %02d:00:00", Sys.Date(), input$time_range[1]),
+        tz = "America/Bahia"
+      )
+      end_t <- as.POSIXct(
+        sprintf("%s %02d:59:59", Sys.Date(), input$time_range[2]),
+        tz = "America/Bahia"
+      )
+      recs <- rv$records_sf_bbox |>
+        dplyr::filter(
+          id_athlete %in% sel_ids,
+          timestamp >= start_t,
+          timestamp <= end_t
+        )
 
       # Fastest X
       incProgress(0.2, detail = "Calculando trechos mais r\u00e1pidos...")

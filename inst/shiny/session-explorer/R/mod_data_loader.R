@@ -54,13 +54,9 @@ mod_data_loader_server <- function(id, input, rv) {
         }
       )
 
-      # Convert input$date to proper Date - handle both numeric and character inputs
+      # Convert input$date to proper Date
       the_date <- as.Date(input$date, origin = "1970-01-01")
-      # Force it to be a Date class
       class(the_date) <- "Date"
-
-      start_t <- sprintf("%02d:00:00", input$time_range[1])
-      end_t <- sprintf("%02d:00:00", input$time_range[2])
 
       # ---------------------------------------------------------------
       # 1) Get exercise lists for all athletes (lightweight metadata)
@@ -89,50 +85,21 @@ mod_data_loader_server <- function(id, input, rv) {
       req(exercises)
 
       # ---------------------------------------------------------------
-      # 2) Filter by date/time -> subset of exercises to load
+      # 2) Filter by date only -> load all exercises for the day
       # ---------------------------------------------------------------
-      # Debug: Show what we're filtering
-      cat("\n=== Debug Info ===\n")
-      cat("Total exercises fetched:", nrow(exercises), "\n")
-      cat("the_date class:", class(the_date), "| value:", as.character(the_date), "\n")
-      cat("Time range:", start_t, "to", end_t, "\n")
-      cat("Unique dates in data:", paste(unique(as.Date(exercises$start)), collapse = ", "), "\n")
-      cat("Sample start_time_as_string values:", paste(head(unique(exercises$start_time_as_string), 3), collapse = ", "), "\n")
-
-      # Step-by-step filtering to debug
-      date_filtered <- exercises |>
-        dplyr::filter(as.Date(.data$start) == .env$the_date)
-      cat("Exercises on", as.character(the_date), ":", nrow(date_filtered), "\n")
-
-      if (nrow(date_filtered) > 0) {
-        cat("Sample times for that date:",
-            paste(head(date_filtered$start_time_as_string, 3), collapse = ", "), "\n")
-      }
-
-      exercises_filtered <- exercises |>
-        dplyr::filter(
-          as.Date(.data$start) == .env$the_date,
-          .data$start_time_as_string >= .env$start_t,
-          .data$start_time_as_string <= .env$end_t
-        )
-
-      cat("Filtered exercises (date + time):", nrow(exercises_filtered), "\n")
-      cat("==================\n\n")
+      exercises_filtered <- dplyr::filter(
+        exercises,
+        as.Date(.data$start) == .env$the_date
+      )
 
       if (nrow(exercises_filtered) == 0L) {
         showNotification(
-          sprintf(
-            "Nenhum treino encontrado em %s entre %s\u2013%s",
-            the_date,
-            start_t,
-            end_t
-          ),
+          sprintf("Nenhum treino encontrado em %s", the_date),
           type = "warning",
           duration = 5
         )
         return()
       }
-      str(exercises_filtered)
       showNotification(
         sprintf(
           "%d treino(s) de %d atleta(s)",

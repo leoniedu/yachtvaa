@@ -73,9 +73,7 @@ ui <- page_navbar(
       numericInput(
         "distance_m", "Dist\u00e2ncia (m)",
         value = 1000, min = 100, max = 5000, step = 100
-      ),
-      actionButton("analyze_btn", "Analisar",
-                   class = "btn-success w-100")
+      )
     )
   ),
 
@@ -167,24 +165,28 @@ server <- function(input, output, session) {
   })
 
   # ---------------------------
-  # Analysis trigger: fires on button click, data load, or athlete change
+  # Analysis trigger: auto-fires on data load, athlete change, or distance change
   # ---------------------------
   analysis_trigger <- reactiveVal(0)
 
-  # Trigger on button click
-  observeEvent(input$analyze_btn, {
-    analysis_trigger(analysis_trigger() + 1)
-  })
-
-  # Auto-trigger when data loads (first time only)
+  # ---------------------------
+  # Phase 2: Auto-analysis triggers
+  # ---------------------------
+  # Auto-trigger whenever data loads or reloads
   observeEvent(rv$paddlers, {
     req(rv$paddlers)
     analysis_trigger(analysis_trigger() + 1)
-  }, once = TRUE)
+  })
 
-  # Auto-trigger when athlete selection changes (after initial analysis)
+  # Auto-trigger when athlete selection changes
   observeEvent(input$selected_athletes, {
-    req(rv$paddlers, !is.null(rv$fastx))
+    req(rv$paddlers)
+    analysis_trigger(analysis_trigger() + 1)
+  }, ignoreInit = TRUE)
+
+  # Auto-trigger when distance parameter changes
+  observeEvent(input$distance_m, {
+    req(rv$paddlers)
     analysis_trigger(analysis_trigger() + 1)
   }, ignoreInit = TRUE)
 

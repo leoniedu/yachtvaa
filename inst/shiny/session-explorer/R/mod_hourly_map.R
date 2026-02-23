@@ -26,14 +26,12 @@ mod_hourly_map_server <- function(id, rv) {
 
       grib_times <- rv$grib_data$grib_times
       n_hours    <- rv$grib_data$n_hours
-      records_time_range <- range(rv$records_sf$timestamp)
 
-      # Determine training hours
-      training_idx <- which(
-        grib_times >= lubridate::floor_date(records_time_range[1], "hour") &
-          grib_times <= lubridate::ceiling_date(records_time_range[2], "hour")
-      )
-      if (length(training_idx) == 0) training_idx <- seq_len(n_hours)
+      # Only show hours that have fastest segments (athletes in the water)
+      seg_hours_utc <- as.integer(format(rv$fastx$start_time, "%H", tz = "UTC"))
+      active_hour_idx <- sort(unique(pmin(pmax(seg_hours_utc, 0L), n_hours - 1L) + 1L))
+      if (length(active_hour_idx) == 0) return(NULL)
+      training_idx <- active_hour_idx
 
       # Build current arrows for each hour
       all_arrows <- purrr::map(training_idx, function(h_idx) {
@@ -53,15 +51,10 @@ mod_hourly_map_server <- function(id, rv) {
         purrr::list_rbind()
 
       # Assign segments to hours
-      seg_hour_utc <- as.numeric(
-        format(rv$fastx$start_time, "%H", tz = "UTC")
-      )
-      seg_hour_idx <- pmin(pmax(seg_hour_utc, 0L), n_hours - 1L) + 1L
-
       segments_hourly <- rv$fastx |>
         tibble::as_tibble() |>
         dplyr::mutate(
-          hour_idx = seg_hour_idx,
+          hour_idx = pmin(pmax(as.integer(format(start_time, "%H", tz = "UTC")), 0L), n_hours - 1L) + 1L,
           hour     = format(
             lubridate::with_tz(grib_times[hour_idx], "America/Bahia"),
             "%Hh"

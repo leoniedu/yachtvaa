@@ -15,10 +15,8 @@ BBOX_SSA <- c(
 # Simple in-memory cache (avoid disk cache issues)
 .exercise_cache <- new.env(hash = TRUE, parent = emptyenv())
 
-.get_exercises_cached <- function(athlete_id, session = NULL, use_db = TRUE) {
-  cache_key <- paste0("athlete_", athlete_id, "_session_",
-                      if(is.null(session)) "null" else "auth",
-                      "_db_", use_db)
+.get_exercises_cached <- function(athlete_id, session = NULL, use_db = FALSE) {
+  cache_key <- paste0("athlete_", athlete_id)
 
   if (exists(cache_key, envir = .exercise_cache, inherits = FALSE)) {
     return(get(cache_key, envir = .exercise_cache))
@@ -42,24 +40,19 @@ mod_data_loader_server <- function(id, input, rv) {
         rm(list = ls(envir = .exercise_cache), envir = .exercise_cache)
       }
 
-      # Auth (only if force refresh is enabled)
-      session_treinus <- NULL
-      if (isTRUE(input$force_refresh)) {
-        incProgress(0.05, detail = "Autenticando...")
-        session_treinus <- tryCatch(
-          rtreinus::treinus_auth(),
-          error = function(e) {
-            showNotification(
-              paste("Erro de autentica\u00e7\u00e3o:", conditionMessage(e)),
-              type = "error",
-              duration = 10
-            )
-            NULL
-          }
-        )
-      } else {
-        incProgress(0.05, detail = "Usando cache local...")
-      }
+      # Auth: always authenticate; force_refresh only clears the in-memory cache
+      incProgress(0.05, detail = "Autenticando...")
+      session_treinus <- tryCatch(
+        rtreinus::treinus_auth(),
+        error = function(e) {
+          showNotification(
+            paste("Erro de autentica\u00e7\u00e3o:", conditionMessage(e)),
+            type = "error",
+            duration = 10
+          )
+          NULL
+        }
+      )
 
       # Convert input$date to proper Date - handle both numeric and character inputs
       the_date <- as.Date(input$date, origin = "1970-01-01")
@@ -75,16 +68,11 @@ mod_data_loader_server <- function(id, input, rv) {
       incProgress(0.1, detail = "Buscando lista de treinos...")
       exercises <- tryCatch(
         {
-          # If we have a session from successful auth, use it (will fetch fresh)
-          # Otherwise, fall back to use_db = TRUE (local cache)
-          has_valid_session <- !is.null(session_treinus)
-          use_local_db <- !has_valid_session
-
           purrr::map(1:70, function(aid) {
             .get_exercises_cached(
               athlete_id = aid,
               session = session_treinus,
-              use_db = use_local_db
+              use_db = FALSE
             )
           }) |>
             purrr::list_rbind()

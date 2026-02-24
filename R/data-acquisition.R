@@ -115,7 +115,7 @@ fetch_paddler_records <- function(
 
 #' Fetch buoy environmental data
 #'
-#' Thin wrapper around `simcostar::simcosta_fetch()` for the default buoy.
+#' Thin wrapper around `rsimcosta::simcosta_fetch()` for the default buoy.
 #'
 #' @param start Start time (POSIXct, Date, character, or numeric Unix timestamp).
 #' @param end End time (same types as start).
@@ -131,7 +131,7 @@ fetch_buoy_data <- function(
   endpoint = c("standard", "currents")
 ) {
   cli::cli_inform("Fetching buoy {boia_id} data...")
-  simcostar::simcosta_fetch(
+  rsimcosta::simcosta_fetch(
     boia_id = boia_id,
     start = start,
     end = end,

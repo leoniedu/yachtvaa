@@ -25,7 +25,7 @@ Imports:
     purrr (>= 1.0.0),
     rlang (>= 1.1.0),
     sf,
-    simcostar,
+    rsimcosta,
     terra,
     tibble,
     tidyr,

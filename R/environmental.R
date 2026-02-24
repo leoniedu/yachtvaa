@@ -7,7 +7,7 @@
 #' Creates a regular time grid at `interval_sec` spacing and linearly
 #' interpolates all numeric columns using [zoo::na.approx()].
 #'
-#' @param buoy_data A data frame from `simcostar::simcosta_fetch()` with a
+#' @param buoy_data A data frame from `rsimcosta::simcosta_fetch()` with a
 #'   `datetime` column (POSIXct) and numeric measurement columns.
 #' @param interval_sec Interpolation interval in seconds. Default 600 (10 min).
 #' @return A tibble with regularly spaced `datetime` and interpolated columns.

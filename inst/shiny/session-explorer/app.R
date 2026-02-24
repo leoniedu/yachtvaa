@@ -30,17 +30,38 @@ for (f in list.files("R", full.names = TRUE, pattern = "\\.R$")) source(f)
 # UI
 # ---------------------------------------------------------------------------
 ui <- page_navbar(
-  title = "YachtVAA \u2014 Explorador de Treinos",
+  title = "YachtVAA",
+  window_title = "YachtVAA \u2014 Explorador de Treinos",
   theme = bs_theme(
     version = 5,
     bootswatch = "flatly",
     base_font = font_google("Inter"),
-    "nav-link-padding-y" = "0.3rem"
+    "nav-link-padding-y" = "0.3rem",
+    "font-size-base" = "0.9rem"
   ),
   fillable = TRUE,
+  # Shorten title + add responsive CSS for mobile nav
+  header = tags$head(
+    tags$meta(name = "viewport",
+              content = "width=device-width, initial-scale=1, maximum-scale=1"),
+    tags$style(HTML("
+      /* Hide nav-tab text on narrow screens; keep icons */
+      @media (max-width: 480px) {
+        .navbar-nav .nav-link span.nav-text { display: none; }
+        .navbar-nav .nav-link { padding-left: 0.5rem; padding-right: 0.5rem; }
+      }
+      /* Ensure sidebar toggle button is reachable on phones */
+      .bslib-sidebar-layout > .collapse-toggle { min-width: 44px; min-height: 44px; }
+      /* Taller touch targets for buttons */
+      .btn { min-height: 44px; }
+      /* Prevent date/slider overflow */
+      .sidebar .shiny-input-container { max-width: 100%; }
+    "))
+  ),
 
   sidebar = sidebar(
-    width = 280,
+    width = 260,
+    open = list(desktop = "open", mobile = "closed"),
     title = "Configura\u00e7\u00e3o",
 
     dateInput(
@@ -51,7 +72,7 @@ ui <- page_navbar(
     ),
     sliderInput(
       "time_range", "Hor\u00e1rio",
-      min = 0, max = 23, value = c(0, 23),
+      min = 0, max = 23, value = c(6, 23),
       step = 1, post = "h"
     ),
     actionButton("load_btn", "Carregar Dados",
@@ -71,36 +92,35 @@ ui <- page_navbar(
     )
   ),
 
-  # Tab panels
+  # Tab panels — wrap label text in span.nav-text so CSS can hide it on phones
   nav_panel(
-    title = "Atletas",
-    icon = icon("users"),
+    title = tagList(icon("users"), tags$span("Atletas", class = "nav-text ms-1")),
+    value = "tab_atletas",
     mod_summary_ui("summary")
   ),
   nav_panel(
-    title = "Mapa",
-    icon = icon("map"),
+    title = tagList(icon("map"), tags$span("Mapa", class = "nav-text ms-1")),
+    value = "tab_mapa",
     mod_track_map_ui("track_map")
   ),
   nav_panel(
-    title = "Condi\u00e7\u00f5es",
-    icon = icon("cloud-sun"),
+    title = tagList(icon("cloud-sun"), tags$span("Condi\u00e7\u00f5es", class = "nav-text ms-1")),
+    value = "tab_cond",
     mod_conditions_table_ui("conditions")
   ),
-
   nav_panel(
-    title = "Polares",
-    icon = icon("compass"),
+    title = tagList(icon("compass"), tags$span("Polares", class = "nav-text ms-1")),
+    value = "tab_polares",
     mod_polar_plots_ui("polars")
   ),
   nav_panel(
-    title = "Classifica\u00e7\u00e3o",
-    icon = icon("trophy"),
+    title = tagList(icon("trophy"), tags$span("Class.", class = "nav-text ms-1")),
+    value = "tab_class",
     mod_fastest_table_ui("fastest")
   ),
   nav_panel(
-    title = "Mapa Hor\u00e1rio",
-    icon = icon("clock"),
+    title = tagList(icon("clock"), tags$span("Hor\u00e1rio", class = "nav-text ms-1")),
+    value = "tab_hourly",
     mod_hourly_map_ui("hourly_map")
   )
 )

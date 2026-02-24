@@ -12,104 +12,120 @@ BBOX_SSA <- c(
   ymax = -12.81308
 )
 
-# Simple in-memory cache (avoid disk cache issues)
-.exercise_cache <- new.env(hash = TRUE, parent = emptyenv())
-
-.get_exercises_cached <- function(athlete_id, session = NULL) {
-  cache_key <- paste0(
-    "athlete_",
-    athlete_id,
-    if (is.null(session)) "_db" else "_api"
+# ---------------------------------------------------------------------------
+# S3-backed persistent cache (survives Connect Cloud container restarts)
+# Uses AWS S3 via memoise::cache_s3() + aws.s3.
+# Credentials from env vars: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY,
+#   AWS_DEFAULT_REGION (e.g. "us-east-1")
+# Falls back to in-memory cache if aws.s3 is unavailable or credentials absent.
+# ---------------------------------------------------------------------------
+.make_s3_cache <- function(bucket = "yachtvaa-cache") {
+  if (!requireNamespace("aws.s3", quietly = TRUE)) return(NULL)
+  if (nchar(Sys.getenv("AWS_ACCESS_KEY_ID")) == 0L) return(NULL)
+  tryCatch(
+    memoise::cache_s3(bucket),
+    error = function(e) {
+      message("S3 cache unavailable, using in-memory: ", conditionMessage(e))
+      NULL
+    }
   )
+}
 
-  if (exists(cache_key, envir = .exercise_cache, inherits = FALSE)) {
-    return(get(cache_key, envir = .exercise_cache))
-  }
+.s3_cache <- .make_s3_cache()
 
-  # use_db=TRUE: reads from local DB when session=NULL, or fetches+writes DB when session provided
-  result <- rtreinus::treinus_get_exercises(
-    athlete_id = athlete_id,
-    session = session,
-    use_db = TRUE
-  )
+# ---------------------------------------------------------------------------
+# Global memoised auth + exercise list (shared across all sessions)
+#   .get_treinus_session  : re-authenticates at most once per hour (in-memory)
+#   .fetch_all_exercises  : keyed by date — auto-refetches on a new day;
+#                           S3-backed so survives restarts; button calls forget()
+#   .get_exercise_analysis: GPS data keyed by (exercise_id, athlete_id);
+#                           S3-backed so never re-downloaded after first fetch
+# ---------------------------------------------------------------------------
+.get_treinus_session <- memoise::memoise(
+  rtreinus::treinus_auth,
+  cache = cachem::cache_mem(max_age = 3600)   # always in-memory; tokens are ephemeral
+)
 
-  assign(cache_key, result, envir = .exercise_cache)
-  result
+.fetch_all_exercises <- memoise::memoise(
+  function(today) {   # today acts as the cache key: new day = new fetch
+    session <- .get_treinus_session()
+    purrr::map(1:70, \(aid)
+      rtreinus::treinus_get_exercises(
+        athlete_id = aid,
+        session    = session,
+        use_db     = TRUE
+      )
+    ) |> purrr::list_rbind()
+  },
+  cache = if (!is.null(.s3_cache)) .s3_cache else cachem::cache_mem()
+)
+
+# GPS analysis: keyed by (exercise_id, athlete_id) — content never changes.
+# session is fetched internally so it is not part of the cache key.
+.get_exercise_analysis <- memoise::memoise(
+  function(exercise_id, athlete_id) {
+    session <- tryCatch(.get_treinus_session(), error = function(e) NULL)
+    rtreinus::treinus_get_exercise_analysis(
+      exercise_id = exercise_id,
+      athlete_id  = athlete_id,
+      session     = session,
+      cache       = TRUE   # rtreinus also caches locally for same-session speed
+    )
+  },
+  cache = if (!is.null(.s3_cache)) .s3_cache else cachem::cache_mem()
+)
+
+# Returns the exercise list for today.
+# force = TRUE (button click) drops the cache so it re-fetches immediately.
+.get_exercises <- function(force = FALSE) {
+  if (force) memoise::forget(.fetch_all_exercises)
+  .fetch_all_exercises(Sys.Date())
 }
 
 mod_data_loader_server <- function(id, input, rv) {
+
   observeEvent(input$load_btn, {
     withProgress(message = "Carregando dados...", value = 0, {
-      # Clear in-memory cache if force refresh is enabled
-      if (isTRUE(input$force_refresh)) {
-        rm(list = ls(envir = .exercise_cache), envir = .exercise_cache)
-      }
-
-      # Auth: only authenticate when force_refresh is checked
-      if (isTRUE(input$force_refresh)) {
-        incProgress(0.05, detail = "Autenticando...")
-        session_treinus <- tryCatch(
-          rtreinus::treinus_auth(),
-          error = function(e) {
-            showNotification(
-              paste("Erro de autenticação:", conditionMessage(e)),
-              type = "error",
-              duration = 10
-            )
-            NULL
-          }
-        )
-      } else {
-        incProgress(0.05, detail = "Usando dados locais...")
-        session_treinus <- NULL
-      }
-      use_local_db <- is.null(session_treinus)
 
       # Convert input$date to proper Date
       the_date <- as.Date(input$date, origin = "1970-01-01")
       class(the_date) <- "Date"
 
       # ---------------------------------------------------------------
-      # 1) Get exercise lists for all athletes (lightweight metadata)
+      # 1) Exercise list — auto-logins, cached 30 min, shared across sessions
       # ---------------------------------------------------------------
       incProgress(0.1, detail = "Buscando lista de treinos...")
       exercises <- tryCatch(
-        {
-          if (use_local_db) {
-            # DB returns all athletes at once; no need to iterate
-            rtreinus::treinus_get_exercises_db()
-          } else {
-            purrr::map(1:70, function(aid) {
-              .get_exercises_cached(
-                athlete_id = aid,
-                session = session_treinus
-              )
-            }) |>
-              purrr::list_rbind()
-          }
-        },
+        .get_exercises(),
         error = function(e) {
-          msg <- conditionMessage(e)
-          if (use_local_db && grepl("no such table", msg, ignore.case = TRUE)) {
-            showNotification(
-              "Banco local vazio. Marque 'Forçar atualização' para buscar da API.",
-              type = "error",
-              duration = 15
-            )
-          } else {
-            showNotification(
-              paste("Erro ao buscar treinos:", msg),
-              type = "error",
-              duration = 10
-            )
-          }
-          NULL
+          # Auth / API failed; fall back to local DB
+          showNotification(
+            paste("API indispon\u00edvel, usando banco local:", conditionMessage(e)),
+            type = "warning", duration = 5
+          )
+          tryCatch(
+            rtreinus::treinus_get_exercises_db(),
+            error = function(e2) {
+              if (grepl("no such table", conditionMessage(e2), ignore.case = TRUE)) {
+                showNotification(
+                  "Banco local vazio. Clique em 'Atualizar lista de treinos' para buscar da API.",
+                  type = "error", duration = 15
+                )
+              } else {
+                showNotification(
+                  paste("Erro ao buscar treinos:", conditionMessage(e2)),
+                  type = "error", duration = 10
+                )
+              }
+              NULL
+            }
+          )
         }
       )
       req(exercises)
 
       # ---------------------------------------------------------------
-      # 2) Filter by date only -> load all exercises for the day
+      # 2) Filter by date
       # ---------------------------------------------------------------
       exercises_filtered <- dplyr::filter(
         exercises,
@@ -119,8 +135,7 @@ mod_data_loader_server <- function(id, input, rv) {
       if (nrow(exercises_filtered) == 0L) {
         showNotification(
           sprintf("Nenhum treino encontrado em %s", the_date),
-          type = "warning",
-          duration = 5
+          type = "warning", duration = 5
         )
         return()
       }
@@ -130,24 +145,19 @@ mod_data_loader_server <- function(id, input, rv) {
           nrow(exercises_filtered),
           length(unique(exercises_filtered$id_athlete))
         ),
-        type = "message",
-        duration = 3
+        type = "message", duration = 3
       )
 
       # ---------------------------------------------------------------
-      # 3) Load GPS records only for filtered exercises
+      # 3) Load GPS — S3-backed memoise; falls back to rtreinus disk cache
       # ---------------------------------------------------------------
       incProgress(0.2, detail = "Buscando GPS...")
+
       analyses <- purrr::pmap(
         exercises_filtered,
         function(id_exercise, id_athlete, ...) {
           tryCatch(
-            rtreinus::treinus_get_exercise_analysis(
-              exercise_id = id_exercise,
-              athlete_id = id_athlete,
-              session = session_treinus,
-              cache = TRUE
-            ),
+            .get_exercise_analysis(id_exercise, id_athlete),
             error = function(e) NULL
           )
         }
@@ -155,12 +165,10 @@ mod_data_loader_server <- function(id, input, rv) {
         purrr::compact()
 
       if (length(analyses) == 0L) {
-        msg <- if (use_local_db) {
-          "GPS n\u00e3o encontrado no cache. Marque 'For\u00e7ar atualiza\u00e7\u00e3o' para buscar da API."
-        } else {
-          "Nenhum GPS encontrado para os treinos selecionados."
-        }
-        showNotification(msg, type = "error", duration = 10)
+        showNotification(
+          "GPS n\u00e3o encontrado. Clique em 'Atualizar lista de treinos' para buscar da API.",
+          type = "error", duration = 10
+        )
         return()
       }
       if (length(analyses) < nrow(exercises_filtered)) {
@@ -345,7 +353,8 @@ mod_data_loader_server <- function(id, input, rv) {
           grib <- rsiscorar::get_grib(
             date = as.character(the_date),
             area = "baiatos",
-            resolution = 0.001
+            resolution = 0.001,
+            fallback = FALSE
           )
 
           layer_names <- names(grib)
@@ -404,6 +413,30 @@ mod_data_loader_server <- function(id, input, rv) {
         sprintf("%d atletas encontrados na \u00e1rea", nrow(rv$paddlers)),
         type = "message",
         duration = 5
+      )
+    })
+  })
+
+  # ---------------------------
+  # Force-refresh the exercise list (bypasses 30-min cache)
+  # ---------------------------
+  observeEvent(input$refresh_exercises_btn, {
+    withProgress(message = "Atualizando lista de treinos...", value = 0.2, {
+      exercises <- tryCatch(
+        .get_exercises(force = TRUE),
+        error = function(e) {
+          showNotification(
+            paste("Erro ao atualizar:", conditionMessage(e)),
+            type = "error", duration = 10
+          )
+          NULL
+        }
+      )
+      req(exercises)
+      incProgress(0.8, detail = "Pronto!")
+      showNotification(
+        sprintf("Lista atualizada: %d treinos no total", nrow(exercises)),
+        type = "message", duration = 5
       )
     })
   })

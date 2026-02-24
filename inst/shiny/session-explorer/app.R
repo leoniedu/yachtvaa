@@ -5,13 +5,7 @@
 # Memoise marks cache as "destroyed" if directory doesn't exist when it initializes
 # MUST happen BEFORE rtreinus is loaded through yachtvaa
 tryCatch({
-  cache_base <- file.path(
-    Sys.getenv("HOME"), "Library/Caches/org.R-project.R/R"
-  )
-  rtreinus_cache <- file.path(cache_base, "rtreinus")
-  memoise_cache <- file.path(rtreinus_cache, "memoise")
-
-  # Ensure directories exist before libraries load
+  memoise_cache <- file.path(tools::R_user_dir("rtreinus", "cache"), "memoise")
   if (!dir.exists(memoise_cache)) {
     dir.create(memoise_cache, recursive = TRUE, showWarnings = FALSE)
   }
@@ -26,6 +20,8 @@ library(dplyr)
 library(sf)
 library(leaflet)
 library(reactable)
+
+.app_password <- "vaa2222"
 
 # Source Shiny modules
 for (f in list.files("R", full.names = TRUE, pattern = "\\.R$")) source(f)
@@ -58,12 +54,10 @@ ui <- page_navbar(
       min = 0, max = 23, value = c(0, 23),
       step = 1, post = "h"
     ),
-    checkboxInput(
-      "force_refresh", "For\u00e7ar atualiza\u00e7\u00e3o (login)",
-      value = FALSE
-    ),
     actionButton("load_btn", "Carregar Dados",
-                 class = "btn-primary w-100 mb-3"),
+                 class = "btn-primary w-100 mb-2"),
+    actionButton("refresh_exercises_btn", "Atualizar lista de treinos",
+                 class = "btn-outline-secondary w-100 mb-3"),
 
     # Phase 2: shown after data loads
     conditionalPanel(
@@ -116,6 +110,21 @@ ui <- page_navbar(
 # ---------------------------------------------------------------------------
 server <- function(input, output, session) {
 
+  showModal(modalDialog(
+    title = "YachtVAA",
+    passwordInput("app_password", "Senha:"),
+    footer = actionButton("app_login", "Entrar", class = "btn-primary w-100"),
+    easyClose = FALSE
+  ))
+
+  observeEvent(input$app_login, {
+    if (isTRUE(input$app_password == .app_password)) {
+      removeModal()
+    } else {
+      showNotification("Senha incorreta.", type = "error")
+    }
+  })
+
   # Shared reactive values
   rv <- reactiveValues(
     # Phase 1
@@ -153,10 +162,8 @@ server <- function(input, output, session) {
   # ---------------------------
   output$athlete_checkboxes <- renderUI({
     req(rv$paddlers)
-    choices <- setNames(
-      rv$paddlers$id_athlete,
-      rv$paddlers$fullname_athlete
-    )
+    sorted <- rv$paddlers[order(rv$paddlers$fullname_athlete), ]
+    choices <- setNames(sorted$id_athlete, sorted$fullname_athlete)
     checkboxGroupInput(
       "selected_athletes", "Atletas",
       choices = choices,
@@ -201,12 +208,13 @@ server <- function(input, output, session) {
   # ---------------------------
   observeEvent(analysis_trigger(), {
     req(analysis_trigger() > 0)
-    req(rv$records_sf_bbox, rv$buoy_ip, rv$grib_cropped)
+    req(rv$records_sf_bbox, rv$buoy_ip, rv$grib_cropped, rv$grib_data, rv$the_date)
 
     sel_ids <- as.integer(input$selected_athletes)
     req(length(sel_ids) > 0)
 
     withProgress(message = "Analisando...", value = 0, {
+      tryCatch({
 
       # Filter records to selected athletes and time range
       start_t <- as.POSIXct(
@@ -315,6 +323,12 @@ server <- function(input, output, session) {
         rv$grib_cropped$v_study,
         rv$grib_data$grib_times
       )
+      }, error = function(e) {
+        showNotification(
+          paste("Erro na análise:", conditionMessage(e)),
+          type = "error", duration = 15
+        )
+      })
     })
   })
 

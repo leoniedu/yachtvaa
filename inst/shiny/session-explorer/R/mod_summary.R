@@ -151,7 +151,6 @@ mod_summary_server <- function(id, rv, selected_athletes) {
       sel_ids <- as.integer(selected_athletes())
       tbl <- rv$paddlers |>
         dplyr::filter(id_athlete %in% sel_ids) |>
-        dplyr::arrange(dplyr::desc(track_distance_m)) |>
         dplyr::mutate(
           track_distance_km = round(track_distance_m / 1000, 1),
           duration_fmt = sprintf(
@@ -167,7 +166,7 @@ mod_summary_server <- function(id, rv, selected_athletes) {
           id_athlete, fullname_athlete, first_fix_fmt,
           duration_fmt, track_distance_km, speed_kmh
         ) |>
-        dplyr::arrange(dplyr::desc(speed_kmh))
+        dplyr::arrange(fullname_athlete)
 
       reactable::reactable(
         tbl,

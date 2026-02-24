@@ -11,20 +11,17 @@ mod_summary_ui <- function(id) {
       bslib::value_box(
         title = "Atletas na \u00e1gua",
         value = shiny::textOutput(ns("n_paddlers")),
-        theme = "primary",
-        showcase = shiny::icon("users")
+        theme = "primary"
       ),
       bslib::value_box(
         title = "Dura\u00e7\u00e3o m\u00e9dia",
         value = shiny::textOutput(ns("avg_duration")),
-        theme = "info",
-        showcase = shiny::icon("clock")
+        theme = "info"
       ),
       bslib::value_box(
         title = "Corrente m\u00e9dia (SISCORAR)",
         value = shiny::textOutput(ns("avg_current")),
-        theme = "warning",
-        showcase = shiny::icon("water")
+        theme = "warning"
       )
     ),
     # Row 2: top performers
@@ -41,7 +38,7 @@ mod_summary_ui <- function(id) {
         theme = "secondary"
       ),
       bslib::value_box(
-        title = "Maior velocidade m\u00e9dia",
+        title = "Maior vel. m\u00e9dia",
         value = shiny::uiOutput(ns("top_speed")),
         theme = "danger"
       )

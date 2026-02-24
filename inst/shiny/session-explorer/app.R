@@ -71,15 +71,6 @@ ui <- page_navbar(
           font-size: 0.95rem !important;
           line-height: 1.2 !important;
         }
-        .bslib-value-box .value-box-showcase {
-          max-width: 2rem !important;
-          padding: 0 !important;
-        }
-        .bslib-value-box .value-box-showcase .fa,
-        .bslib-value-box .value-box-showcase .bi {
-          font-size: 1.1rem !important;
-        }
-
         /* ---- nav tabs: icons only on narrow screens ---- */
         @media (max-width: 480px) {
           .navbar-nav .nav-link span.nav-text { display: none; }

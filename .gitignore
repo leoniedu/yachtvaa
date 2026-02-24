@@ -5,5 +5,3 @@
 .DS_Store
 *.Rproj
 inst/doc
-man/*.Rd
-NAMESPACE

@@ -242,6 +242,7 @@ server <- function(input, output, session) {
       selected = choices
     )
   })
+  outputOptions(output, "athlete_checkboxes", suspendWhenHidden = FALSE)
 
   # ---------------------------
   # Analysis trigger: auto-fires on data load, athlete change, or distance change

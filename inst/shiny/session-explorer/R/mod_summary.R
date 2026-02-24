@@ -5,8 +5,9 @@ mod_summary_ui <- function(id) {
   ns <- shiny::NS(id)
   bslib::layout_columns(
     col_widths = 12,
+    # Row 1: session overview
     bslib::layout_columns(
-      col_widths = c(3, 3, 3, 3),
+      col_widths = c(4, 4, 4),
       bslib::value_box(
         title = "Atletas na \u00e1gua",
         value = shiny::textOutput(ns("n_paddlers")),
@@ -20,16 +21,29 @@ mod_summary_ui <- function(id) {
         showcase = shiny::icon("clock")
       ),
       bslib::value_box(
-        title = "Mais r\u00e1pido",
-        value = shiny::textOutput(ns("winner")),
-        theme = "success",
-        showcase = shiny::icon("trophy")
-      ),
-      bslib::value_box(
         title = "Corrente m\u00e9dia (SISCORAR)",
         value = shiny::textOutput(ns("avg_current")),
         theme = "warning",
         showcase = shiny::icon("water")
+      )
+    ),
+    # Row 2: top performers
+    bslib::layout_columns(
+      col_widths = c(4, 4, 4),
+      bslib::value_box(
+        title = shiny::uiOutput(ns("winner_title")),
+        value = shiny::uiOutput(ns("winner")),
+        theme = "success"
+      ),
+      bslib::value_box(
+        title = "Maior dist\u00e2ncia",
+        value = shiny::uiOutput(ns("longest_paddle")),
+        theme = "secondary"
+      ),
+      bslib::value_box(
+        title = "Maior velocidade m\u00e9dia",
+        value = shiny::uiOutput(ns("top_speed")),
+        theme = "danger"
       )
     ),
     bslib::card(
@@ -58,17 +72,6 @@ mod_summary_server <- function(id, rv, selected_athletes) {
       sprintf("%d:%02d", floor(avg / 60), round(avg %% 60))
     })
 
-    output$winner <- shiny::renderText({
-      req(rv$league_fmt)
-      lf <- rv$league_fmt
-      secs <- lf$predicted_time_sec[1]
-      sprintf(
-        "%s (%d:%02d)",
-        lf$fullname_athlete[1],
-        floor(secs / 60), round(secs %% 60)
-      )
-    })
-
     output$avg_current <- shiny::renderText({
       req(rv$grib_hourly)
       records_time_range <- range(rv$records_sf$timestamp)
@@ -79,6 +82,67 @@ mod_summary_server <- function(id, rv, selected_athletes) {
         )
       if (nrow(gh) == 0) return("--")
       sprintf("%.1f km/h", mean(gh$current_speed_kmh, na.rm = TRUE))
+    })
+
+    output$winner_title <- shiny::renderUI({
+      req(rv$league_fmt)
+      dist <- rv$league_fmt$distance_m_target[1]
+      shiny::HTML(paste0("Mais r\u00e1pido (", as.integer(dist), " metros)"))
+    })
+
+    output$winner <- shiny::renderUI({
+      req(rv$league_fmt)
+      lf <- rv$league_fmt
+      secs <- lf$predicted_time_sec[1]
+      shiny::tagList(
+        shiny::tags$span(
+          sprintf("%d:%02d", floor(secs / 60), round(secs %% 60)),
+          style = "font-size: 0.75em; line-height: 1;"
+        ),
+        shiny::tags$p(
+          lf$fullname_athlete[1],
+          style = "font-size: 0.8rem; margin: 0.2em 0 0 0; opacity: 0.85; line-height: 1.2;"
+        )
+      )
+    })
+
+    output$longest_paddle <- shiny::renderUI({
+      req(rv$paddlers, selected_athletes())
+      sel_ids <- as.integer(selected_athletes())
+      p <- rv$paddlers |>
+        dplyr::filter(id_athlete %in% sel_ids) |>
+        dplyr::slice_max(track_distance_m, n = 1, with_ties = FALSE)
+      if (nrow(p) == 0) return("--")
+      shiny::tagList(
+        shiny::tags$span(
+          sprintf("%.1f km", p$track_distance_m[1] / 1000),
+          style = "font-size: 0.75em; line-height: 1;"
+        ),
+        shiny::tags$p(
+          p$fullname_athlete[1],
+          style = "font-size: 0.8rem; margin: 0.2em 0 0 0; opacity: 0.85; line-height: 1.2;"
+        )
+      )
+    })
+
+    output$top_speed <- shiny::renderUI({
+      req(rv$paddlers, selected_athletes())
+      sel_ids <- as.integer(selected_athletes())
+      p <- rv$paddlers |>
+        dplyr::filter(id_athlete %in% sel_ids) |>
+        dplyr::mutate(speed_kmh = (track_distance_m / duration_min) * 60 / 1000) |>
+        dplyr::slice_max(speed_kmh, n = 1, with_ties = FALSE)
+      if (nrow(p) == 0) return("--")
+      shiny::tagList(
+        shiny::tags$span(
+          sprintf("%.1f km/h", p$speed_kmh[1]),
+          style = "font-size: 0.75em; line-height: 1;"
+        ),
+        shiny::tags$p(
+          p$fullname_athlete[1],
+          style = "font-size: 0.8rem; margin: 0.2em 0 0 0; opacity: 0.85; line-height: 1.2;"
+        )
+      )
     })
 
     output$paddler_table <- reactable::renderReactable({

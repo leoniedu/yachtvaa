@@ -71,6 +71,7 @@ relative_current <- function(vessel_bearing, current_direction) {
 #'   negative = opposing (increasing effort).
 #' @export
 apparent_conditions <- function(segments, impute_missing_wind = FALSE) {
+  segments <- tibble::as_tibble(segments)
   segments <- .maybe_impute_wind(segments, impute_missing_wind)
 
   wind_rel <- relative_wind(segments$bearing_deg, segments$wind_direction_deg,

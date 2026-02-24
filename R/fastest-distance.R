@@ -220,7 +220,7 @@ fastest_straight_distance <- function(
 #' @noRd
 .empty_fastest_result <- function(athlete_col) {
   dt <- data.table::data.table(
-    athlete = character(),
+    athlete = integer(),
     distance_m_target = numeric(),
     predicted_time_sec = numeric(),
     avg_speed_mps = numeric(),

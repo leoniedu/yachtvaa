@@ -15,17 +15,22 @@ BBOX_SSA <- c(
 # Simple in-memory cache (avoid disk cache issues)
 .exercise_cache <- new.env(hash = TRUE, parent = emptyenv())
 
-.get_exercises_cached <- function(athlete_id, session = NULL, use_db = TRUE) {
-  cache_key <- paste0("athlete_", athlete_id, if (use_db) "_db" else "_api")
+.get_exercises_cached <- function(athlete_id, session = NULL) {
+  cache_key <- paste0(
+    "athlete_",
+    athlete_id,
+    if (is.null(session)) "_db" else "_api"
+  )
 
   if (exists(cache_key, envir = .exercise_cache, inherits = FALSE)) {
     return(get(cache_key, envir = .exercise_cache))
   }
 
+  # use_db=TRUE: reads from local DB when session=NULL, or fetches+writes DB when session provided
   result <- rtreinus::treinus_get_exercises(
     athlete_id = athlete_id,
     session = session,
-    use_db = use_db
+    use_db = TRUE
   )
 
   assign(cache_key, result, envir = .exercise_cache)
@@ -40,12 +45,24 @@ mod_data_loader_server <- function(id, input, rv) {
         rm(list = ls(envir = .exercise_cache), envir = .exercise_cache)
       }
 
-      # Auth: try live session; fall back to local DB if auth fails
-      incProgress(0.05, detail = "Autenticando...")
-      session_treinus <- tryCatch(
-        rtreinus::treinus_auth(),
-        error = function(e) NULL  # silently fall back to use_db = TRUE
-      )
+      # Auth: only authenticate when force_refresh is checked
+      if (isTRUE(input$force_refresh)) {
+        incProgress(0.05, detail = "Autenticando...")
+        session_treinus <- tryCatch(
+          rtreinus::treinus_auth(),
+          error = function(e) {
+            showNotification(
+              paste("Erro de autenticação:", conditionMessage(e)),
+              type = "error",
+              duration = 10
+            )
+            NULL
+          }
+        )
+      } else {
+        incProgress(0.05, detail = "Usando dados locais...")
+        session_treinus <- NULL
+      }
       use_local_db <- is.null(session_treinus)
 
       # Convert input$date to proper Date
@@ -58,21 +75,34 @@ mod_data_loader_server <- function(id, input, rv) {
       incProgress(0.1, detail = "Buscando lista de treinos...")
       exercises <- tryCatch(
         {
-          purrr::map(1:70, function(aid) {
-            .get_exercises_cached(
-              athlete_id = aid,
-              session = session_treinus,
-              use_db = use_local_db
-            )
-          }) |>
-            purrr::list_rbind()
+          if (use_local_db) {
+            # DB returns all athletes at once; no need to iterate
+            rtreinus::treinus_get_exercises_db()
+          } else {
+            purrr::map(1:70, function(aid) {
+              .get_exercises_cached(
+                athlete_id = aid,
+                session = session_treinus
+              )
+            }) |>
+              purrr::list_rbind()
+          }
         },
         error = function(e) {
-          showNotification(
-            paste("Erro ao buscar treinos:", conditionMessage(e)),
-            type = "error",
-            duration = 10
-          )
+          msg <- conditionMessage(e)
+          if (use_local_db && grepl("no such table", msg, ignore.case = TRUE)) {
+            showNotification(
+              "Banco local vazio. Marque 'Forçar atualização' para buscar da API.",
+              type = "error",
+              duration = 15
+            )
+          } else {
+            showNotification(
+              paste("Erro ao buscar treinos:", msg),
+              type = "error",
+              duration = 10
+            )
+          }
           NULL
         }
       )
@@ -108,35 +138,45 @@ mod_data_loader_server <- function(id, input, rv) {
       # 3) Load GPS records only for filtered exercises
       # ---------------------------------------------------------------
       incProgress(0.2, detail = "Buscando GPS...")
-      analyses <- tryCatch(
-        {
-          purrr::pmap(
-            exercises_filtered,
-            function(id_exercise, id_athlete, ...) {
-              rtreinus::treinus_get_exercise_analysis(
-                exercise_id = id_exercise,
-                athlete_id = id_athlete,
-                session = session_treinus,
-                cache = TRUE
-              )
-            }
+      analyses <- purrr::pmap(
+        exercises_filtered,
+        function(id_exercise, id_athlete, ...) {
+          tryCatch(
+            rtreinus::treinus_get_exercise_analysis(
+              exercise_id = id_exercise,
+              athlete_id = id_athlete,
+              session = session_treinus,
+              cache = TRUE
+            ),
+            error = function(e) NULL
           )
-        },
-        error = function(e) {
-          showNotification(
-            paste("Erro ao buscar GPS:", conditionMessage(e)),
-            type = "error",
-            duration = 10
-          )
-          NULL
         }
-      )
-      req(analyses)
+      ) |>
+        purrr::compact()
+
+      if (length(analyses) == 0L) {
+        msg <- if (use_local_db) {
+          "GPS n\u00e3o encontrado no cache. Marque 'For\u00e7ar atualiza\u00e7\u00e3o' para buscar da API."
+        } else {
+          "Nenhum GPS encontrado para os treinos selecionados."
+        }
+        showNotification(msg, type = "error", duration = 10)
+        return()
+      }
+      if (length(analyses) < nrow(exercises_filtered)) {
+        showNotification(
+          sprintf(
+            "%d de %d treinos com GPS dispon\u00edvel.",
+            length(analyses), nrow(exercises_filtered)
+          ),
+          type = "warning", duration = 5
+        )
+      }
 
       records <- purrr::map(analyses, function(a) {
         tibble::tibble(
-          id_athlete = a$data$Analysis$IdAthlete,
-          id_exercise = a$data$Analysis$IdExercise,
+          id_athlete = as.integer(a$data$Analysis$IdAthlete),
+          id_exercise = as.integer(a$data$Analysis$IdExercise),
           fullname_athlete = a$data$Analysis$User$FullName,
           rtreinus::treinus_extract_records(a)
         )
@@ -191,6 +231,7 @@ mod_data_loader_server <- function(id, input, rv) {
         records_sf$id_athlete %in% athletes_in_bbox$id_athlete,
       ]
 
+      rv$the_date <- the_date
       rv$records_sf <- records_sf
       rv$records_sf_bbox <- records_sf[
         lengths(sf::st_intersects(records_sf, study_area)) > 0,
@@ -232,14 +273,24 @@ mod_data_loader_server <- function(id, input, rv) {
         dplyr::filter(n_fixes >= 100, track_distance_m >= 200)
 
       # ---------------------------------------------------------------
-      # 5) Buoy data (full day, simcostar caches to SQLite)
+      # 5) Buoy data (only hours when athletes were in the water)
       # ---------------------------------------------------------------
-      incProgress(0.1, detail = "Buscando boia (dia completo)...")
+      athlete_ts_range <- range(records_sf$timestamp, na.rm = TRUE)
+      buoy_start <- as.POSIXct(
+        format(athlete_ts_range[1], "%Y-%m-%d %H:00:00"),
+        tz = "UTC"
+      )
+      buoy_end <- as.POSIXct(
+        format(athlete_ts_range[2] + 3599, "%Y-%m-%d %H:00:00"),
+        tz = "UTC"
+      )
+
+      incProgress(0.1, detail = "Buscando boia...")
       buoy <- tryCatch(
-        simcostar::simcosta_fetch(
+        rsimcosta::simcosta_fetch(
           boia_id = 515L,
-          start = as.POSIXct(paste(the_date, "00:00:00"), tz = "UTC"),
-          end = as.POSIXct(paste(the_date + 1, "00:00:00"), tz = "UTC"),
+          start = buoy_start,
+          end = buoy_end,
           endpoint = c("standard", "currents"),
           wide = TRUE
         ),

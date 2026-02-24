@@ -210,11 +210,11 @@ server <- function(input, output, session) {
 
       # Filter records to selected athletes and time range
       start_t <- as.POSIXct(
-        sprintf("%s %02d:00:00", Sys.Date(), input$time_range[1]),
+        sprintf("%s %02d:00:00", rv$the_date, input$time_range[1]),
         tz = "America/Bahia"
       )
       end_t <- as.POSIXct(
-        sprintf("%s %02d:59:59", Sys.Date(), input$time_range[2]),
+        sprintf("%s %02d:59:59", rv$the_date, input$time_range[2]),
         tz = "America/Bahia"
       )
       recs <- rv$records_sf_bbox |>
@@ -282,8 +282,10 @@ server <- function(input, output, session) {
 
       # Apparent conditions
       incProgress(0.2, detail = "Calculando condi\u00e7\u00f5es aparentes...")
+      has_wind_in_segments <- "wind_speed_kmh" %in% names(rv$matched) &&
+        any(!is.na(rv$matched$wind_speed_kmh))
       rv$conditions <- apparent_conditions(
-        rv$matched, impute_missing_wind = !rv$has_wind
+        rv$matched, impute_missing_wind = !has_wind_in_segments
       )
 
       # Buoy current classification

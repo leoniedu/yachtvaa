@@ -40,23 +40,85 @@ ui <- page_navbar(
     "font-size-base" = "0.9rem"
   ),
   fillable = TRUE,
-  # Shorten title + add responsive CSS for mobile nav
-  header = tags$head(
-    tags$meta(name = "viewport",
-              content = "width=device-width, initial-scale=1, maximum-scale=1"),
-    tags$style(HTML("
-      /* Hide nav-tab text on narrow screens; keep icons */
-      @media (max-width: 480px) {
-        .navbar-nav .nav-link span.nav-text { display: none; }
-        .navbar-nav .nav-link { padding-left: 0.5rem; padding-right: 0.5rem; }
-      }
-      /* Ensure sidebar toggle button is reachable on phones */
-      .bslib-sidebar-layout > .collapse-toggle { min-width: 44px; min-height: 44px; }
-      /* Taller touch targets for buttons */
-      .btn { min-height: 44px; }
-      /* Prevent date/slider overflow */
-      .sidebar .shiny-input-container { max-width: 100%; }
-    "))
+  header = tagList(
+    tags$head(
+      tags$meta(name = "viewport",
+                content = "width=device-width, initial-scale=1, maximum-scale=1"),
+      tags$style(HTML("
+        /* ---- sticky action bar (date + load buttons) ---- */
+        #action-bar {
+          position: sticky;
+          top: 3.4rem;   /* approx flatly navbar height */
+          z-index: 1019;
+        }
+        #action-bar .form-group,
+        #action-bar .shiny-input-container { margin-bottom: 0; }
+        #action-bar .control-label { display: none; }
+        #action-bar input[type='text'] {
+          padding: 0.2rem 0.45rem;
+          font-size: 0.85rem;
+          height: auto;
+        }
+
+        /* ---- compact value boxes ---- */
+        .bslib-value-box { min-height: 72px !important; }
+        .bslib-value-box .card-body { padding: 0.45rem 0.6rem !important; }
+        .bslib-value-box .value-box-title {
+          font-size: 0.62rem !important;
+          margin-bottom: 0.1rem !important;
+        }
+        .bslib-value-box .value-box-value {
+          font-size: 0.95rem !important;
+          line-height: 1.2 !important;
+        }
+        .bslib-value-box .value-box-showcase {
+          max-width: 2rem !important;
+          padding: 0 !important;
+        }
+        .bslib-value-box .value-box-showcase .fa,
+        .bslib-value-box .value-box-showcase .bi {
+          font-size: 1.1rem !important;
+        }
+
+        /* ---- nav tabs: icons only on narrow screens ---- */
+        @media (max-width: 480px) {
+          .navbar-nav .nav-link span.nav-text { display: none; }
+          .navbar-nav .nav-link { padding-left: 0.5rem; padding-right: 0.5rem; }
+        }
+        /* ---- touch targets ---- */
+        .bslib-sidebar-layout > .collapse-toggle { min-width: 44px; min-height: 44px; }
+        .btn { min-height: 38px; }
+        /* ---- sidebar inputs ---- */
+        .sidebar .shiny-input-container { max-width: 100%; }
+      "))
+    ),
+    # Sticky action bar: date picker + primary action buttons always visible
+    tags$div(
+      id = "action-bar",
+      class = "bg-body-secondary border-bottom py-1 px-2",
+      tags$div(
+        class = "d-flex align-items-center gap-2",
+        tags$div(
+          class = "flex-grow-1",
+          dateInput("date", NULL, value = Sys.Date(),
+                    format = "dd/mm/yyyy", language = "pt-BR")
+        ),
+        actionButton(
+          "load_btn",
+          tagList(icon("play"),
+                  tags$span("Carregar", class = "d-none d-sm-inline ms-1")),
+          class = "btn-primary btn-sm flex-shrink-0",
+          title = "Carregar Dados"
+        ),
+        actionButton(
+          "refresh_exercises_btn",
+          tagList(icon("rotate"),
+                  tags$span("Atualizar", class = "d-none d-sm-inline ms-1")),
+          class = "btn-outline-secondary btn-sm flex-shrink-0",
+          title = "Atualizar lista de treinos"
+        )
+      )
+    )
   ),
 
   sidebar = sidebar(
@@ -64,21 +126,11 @@ ui <- page_navbar(
     open = list(desktop = "open", mobile = "closed"),
     title = "Configura\u00e7\u00e3o",
 
-    dateInput(
-      "date", "Data do treino",
-      value = Sys.Date(),
-      format = "dd/mm/yyyy",
-      language = "pt-BR"
-    ),
     sliderInput(
       "time_range", "Hor\u00e1rio",
-      min = 0, max = 23, value = c(6, 23),
+      min = 0, max = 23, value = c(0, 23),
       step = 1, post = "h"
     ),
-    actionButton("load_btn", "Carregar Dados",
-                 class = "btn-primary w-100 mb-2"),
-    actionButton("refresh_exercises_btn", "Atualizar lista de treinos",
-                 class = "btn-outline-secondary w-100 mb-3"),
 
     # Phase 2: shown after data loads
     conditionalPanel(

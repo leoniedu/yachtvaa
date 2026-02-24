@@ -189,6 +189,11 @@ ui <- page_navbar(
 # ---------------------------------------------------------------------------
 server <- function(input, output, session) {
 
+  # iOS Safari suspends WebSocket connections when the screen locks or the
+  # tab goes to background. "force" reconnects the session automatically
+  # instead of showing the grey disconnected overlay.
+  session$allowReconnect("force")
+
   showModal(modalDialog(
     title = "YachtVAA",
     passwordInput("app_password", "Senha:"),

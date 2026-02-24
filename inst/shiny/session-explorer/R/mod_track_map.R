@@ -163,9 +163,11 @@ mod_track_map_server <- function(id, rv, selected_athletes) {
           bbox[["xmax"]], bbox[["ymax"]]
         ) |>
         leaflet::addLayersControl(
-          baseGroups = c("CartoDB", "Sat\u00e9lite"),
+          baseGroups = c("Sat\u00e9lite", "CartoDB"),
           options = leaflet::layersControlOptions(collapsed = FALSE)
-        )
+        ) |>
+        leaflet::showGroup("Sat\u00e9lite") |>
+        leaflet::hideGroup("CartoDB")
     })
 
     # Consistent speed domain for color palette (across all hours)
@@ -359,7 +361,12 @@ mod_track_map_server <- function(id, rv, selected_athletes) {
             label = td$fullname_athlete[i],
             labelOptions = leaflet::labelOptions(
               noHide = TRUE, textOnly = TRUE,
-              style = list("font-size" = "11px", "font-weight" = "bold")
+              style = list(
+                "font-size" = "11px",
+                "font-weight" = "bold",
+                "color" = "white",
+                "text-shadow" = "-1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000"
+              )
             ),
             group = "labels",
             options = leaflet::markerOptions(opacity = 0)

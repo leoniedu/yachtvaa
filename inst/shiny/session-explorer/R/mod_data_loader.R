@@ -350,12 +350,17 @@ mod_data_loader_server <- function(id, input, rv) {
       incProgress(0.3, detail = "Buscando correntes SISCORAR...")
       tryCatch(
         {
+          message("[GRIB debug] date=", the_date,
+                  " GITHUB_PAT set=", nchar(Sys.getenv("GITHUB_PAT")) > 0,
+                  " piggyback installed=", requireNamespace("piggyback", quietly = TRUE),
+                  " cache dir=", file.path(tools::R_user_dir("rsiscorar", "cache"), "gribs"))
           grib <- rsiscorar::get_grib(
             date = as.character(the_date),
             area = "baiatos",
             resolution = 0.001,
             fallback = FALSE
           )
+          message("[GRIB debug] success, layers=", terra::nlyr(grib))
 
           layer_names <- names(grib)
           is_u <- grepl("u-component|UOGRD", layer_names, ignore.case = TRUE)
@@ -400,6 +405,7 @@ mod_data_loader_server <- function(id, input, rv) {
           )
         },
         error = function(e) {
+          message("[GRIB debug] error: ", conditionMessage(e))
           showNotification(
             paste("Erro GRIB:", conditionMessage(e)),
             type = "warning",

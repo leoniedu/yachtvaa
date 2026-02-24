@@ -5,9 +5,11 @@ mod_summary_ui <- function(id) {
   ns <- shiny::NS(id)
   bslib::layout_columns(
     col_widths = 12,
+    gap = "0.35rem",
     # Row 1: session overview
     bslib::layout_columns(
       col_widths = c(4, 4, 4),
+      gap = "0.35rem",
       bslib::value_box(
         title = "Atletas na \u00e1gua",
         value = shiny::textOutput(ns("n_paddlers")),
@@ -27,6 +29,7 @@ mod_summary_ui <- function(id) {
     # Row 2: top performers
     bslib::layout_columns(
       col_widths = c(4, 4, 4),
+      gap = "0.35rem",
       bslib::value_box(
         title = shiny::uiOutput(ns("winner_title")),
         value = shiny::uiOutput(ns("winner")),

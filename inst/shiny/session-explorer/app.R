@@ -45,10 +45,10 @@ ui <- page_navbar(
       tags$meta(name = "viewport",
                 content = "width=device-width, initial-scale=1, maximum-scale=1"),
       tags$style(HTML("
-        /* ---- sticky action bar (date + load buttons) ---- */
+        /* ---- action bar: JS moves it between navbar and sidebar layout
+           so bslib's flex-column page handles visibility on all tabs  ---- */
         #action-bar {
-          position: sticky;
-          top: 3.4rem;   /* approx flatly navbar height */
+          flex-shrink: 0;
           z-index: 1019;
         }
         #action-bar .form-group,
@@ -61,15 +61,18 @@ ui <- page_navbar(
         }
 
         /* ---- compact value boxes ---- */
-        .bslib-value-box { min-height: 72px !important; }
-        .bslib-value-box .card-body { padding: 0.45rem 0.6rem !important; }
+        .bslib-value-box { min-height: 54px !important; }
+        .bslib-value-box .card-body { padding: 0.2rem 0.4rem !important; }
         .bslib-value-box .value-box-title {
-          font-size: 0.62rem !important;
-          margin-bottom: 0.1rem !important;
+          font-size: 0.6rem !important;
+          margin-bottom: 0.05rem !important;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
         .bslib-value-box .value-box-value {
-          font-size: 0.95rem !important;
-          line-height: 1.2 !important;
+          font-size: 0.85rem !important;
+          line-height: 1.1 !important;
         }
         /* ---- nav tabs: icons only on narrow screens ---- */
         @media (max-width: 480px) {
@@ -83,7 +86,20 @@ ui <- page_navbar(
         .sidebar .shiny-input-container { max-width: 100%; }
       "))
     ),
-    # Sticky action bar: date picker + primary action buttons always visible
+    # JS: move action bar out of tab-content into the page-level flex layout.
+    # position: sticky breaks inside bslib's overflow:hidden fillable panels;
+    # inserting it as a flex sibling of the sidebar layout keeps it visible
+    # on every tab without needing position:fixed or padding compensation.
+    tags$script(HTML("
+      document.addEventListener('DOMContentLoaded', function() {
+        var bar = document.getElementById('action-bar');
+        var nav = document.querySelector('nav.navbar');
+        if (bar && nav && nav.parentNode) {
+          nav.parentNode.insertBefore(bar, nav.nextSibling);
+        }
+      });
+    ")),
+    # Action bar: date picker + primary action buttons always visible
     tags$div(
       id = "action-bar",
       class = "bg-body-secondary border-bottom py-1 px-2",

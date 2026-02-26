@@ -189,43 +189,28 @@ struct AthletesView: View {
     // MARK: - Time filter
 
     private var timeFilterSection: some View {
-        Section("Filtro de horário") {
+        Section {
             HStack {
-                Text("Início")
+                Text("Horário")
                 Spacer()
-                if let h = session.filterStartHour {
-                    Text(String(format: "%02d:00", h))
-                        .foregroundStyle(.tint)
-                    Button("Limpar") { session.filterStartHour = nil }
-                        .font(.caption)
-                } else {
-                    Text("—").foregroundStyle(.secondary)
-                }
-                Stepper("", value: Binding(
-                    get: { session.filterStartHour ?? 0 },
-                    set: { session.filterStartHour = $0 }
-                ), in: 0...23)
+                DatePicker("", selection: Binding(
+                    get: { session.analysisStartTime ?? session.gpsStart ?? Date() },
+                    set: { session.analysisStartTime = $0; session.rerunAnalysis() }
+                ), displayedComponents: .hourAndMinute)
                 .labelsHidden()
-                .frame(width: 94)
-            }
-            HStack {
-                Text("Fim")
-                Spacer()
-                if let h = session.filterEndHour {
-                    Text(String(format: "%02d:00", h))
-                        .foregroundStyle(.tint)
-                    Button("Limpar") { session.filterEndHour = nil }
-                        .font(.caption)
-                } else {
-                    Text("—").foregroundStyle(.secondary)
-                }
-                Stepper("", value: Binding(
-                    get: { session.filterEndHour ?? 23 },
-                    set: { session.filterEndHour = $0 }
-                ), in: 0...23)
+                .environment(\.timeZone, AppConfig.timezone)
+                Text("–").foregroundStyle(.secondary)
+                DatePicker("", selection: Binding(
+                    get: { session.analysisEndTime ?? session.gpsEnd ?? Date() },
+                    set: { session.analysisEndTime = $0; session.rerunAnalysis() }
+                ), displayedComponents: .hourAndMinute)
                 .labelsHidden()
-                .frame(width: 94)
+                .environment(\.timeZone, AppConfig.timezone)
             }
+        } header: {
+            Text("Filtro de horário")
+        } footer: {
+            Text("Aplica-se a todas as abas.")
         }
     }
 

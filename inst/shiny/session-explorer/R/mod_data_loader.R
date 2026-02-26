@@ -205,16 +205,44 @@ mod_data_loader_server <- function(id, input, rv) {
           timestamp = as.POSIXct(.data$timestamp, tz = "UTC")
         )
 
+      # Detect Strava timezone issues: Strava uploads have local-time GPS
+      # timestamps while Garmin/Amazfit use UTC.  The Treinus API returns
+      # exercise `start` as a naive local-time string.  Parsing it as UTC
+      # makes it comparable to Strava's local-as-UTC epochs (diff ≈ 0)
+      # whereas Garmin UTC epochs are ~10 800 s ahead.
+      tz_check <- records |>
+        dplyr::summarise(
+          first_ts = min(timestamp),
+          .by = c(id_exercise, id_athlete)
+        ) |>
+        dplyr::left_join(
+          exercises_filtered |>
+            dplyr::select(id_exercise, id_athlete, start),
+          by = c("id_exercise", "id_athlete")
+        ) |>
+        dplyr::mutate(
+          needs_tz_fix = abs(
+            as.numeric(first_ts) -
+              as.numeric(as.POSIXct(start, tz = "UTC"))
+          ) < 1800
+        ) |>
+        dplyr::filter(needs_tz_fix)
+
+      if (nrow(tz_check) > 0) {
+        fix_keys <- paste(tz_check$id_exercise, tz_check$id_athlete)
+        records <- records |>
+          dplyr::mutate(
+            timestamp = dplyr::if_else(
+              paste(id_exercise, id_athlete) %in% fix_keys,
+              timestamp + lubridate::hours(3),
+              timestamp
+            )
+          )
+      }
+
       records_sf <- records |>
         sf::st_as_sf(coords = c("lon", "lat"), remove = FALSE, crs = 4326L) |>
-        sf::st_transform(crs = CRS_UTM24S) |>
-        dplyr::mutate(
-          timestamp = dplyr::if_else(
-            id_athlete == 50,
-            timestamp + (60 * 60 * 3),
-            timestamp
-          )
-        )
+        sf::st_transform(crs = CRS_UTM24S)
 
       study_area <- sf::st_bbox(
         c(

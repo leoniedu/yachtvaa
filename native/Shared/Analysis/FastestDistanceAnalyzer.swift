@@ -13,28 +13,14 @@ struct FastestDistanceAnalyzer {
         guard records.count >= 2 else { return nil }
         let athleteID = records[0].athleteID
 
-        // Flat-earth approximation: convert lat/lon to local meters.
-        // Valid for BTS which spans ~30 km.
-        let latRef = records.reduce(0.0) { $0 + $1.latDeg } / Double(records.count)
-        let metersPerLatDeg = 111_111.0
-        let metersPerLonDeg = 111_111.0 * cos(latRef * .pi / 180)
-
         struct Pt {
-            let x: Double   // meters east
-            let y: Double   // meters north
-            let ts: Double  // Unix seconds
             let lat: Double
             let lon: Double
+            let ts: Double  // Unix seconds
         }
 
         let pts = records.map { r in
-            Pt(
-                x: r.lonDeg * metersPerLonDeg,
-                y: r.latDeg * metersPerLatDeg,
-                ts: r.ts.timeIntervalSince1970,
-                lat: r.latDeg,
-                lon: r.lonDeg
-            )
+            Pt(lat: r.latDeg, lon: r.lonDeg, ts: r.ts.timeIntervalSince1970)
         }
 
         // Split into continuous segments by time gap.
@@ -49,13 +35,13 @@ struct FastestDistanceAnalyzer {
         }
         segments.append(current)
 
-        // For each start i, find the first j where straight-line distance >= distanceM,
+        // For each start i, find the first j where haversine distance >= distanceM,
         // compute predicted time for exactly distanceM, keep the minimum.
         // Mirrors .fastest_distance_vectorized() in R.
-        let distSqThreshold = distanceM * distanceM
         var bestTPred = Double.infinity
         var bestStart: Pt?
         var bestEnd: Pt?
+        var bestDist = 0.0
 
         for seg in segments {
             let n = seg.count
@@ -64,11 +50,11 @@ struct FastestDistanceAnalyzer {
                 let pi = seg[i]
                 for j in (i + 1) ..< n {
                     let pj = seg[j]
-                    let dx = pj.x - pi.x
-                    let dy = pj.y - pi.y
-                    let dSq = dx * dx + dy * dy
-                    guard dSq >= distSqThreshold else { continue }
-                    let d = sqrt(dSq)
+                    let d = CoordinateConverter.haversineDistance(
+                        lat1: pi.lat, lon1: pi.lon,
+                        lat2: pj.lat, lon2: pj.lon
+                    )
+                    guard d >= distanceM else { continue }
                     let dtIJ = pj.ts - pi.ts
                     guard dtIJ > 0 else { break }
                     let tPred = (distanceM * dtIJ) / d
@@ -76,6 +62,7 @@ struct FastestDistanceAnalyzer {
                         bestTPred = tPred
                         bestStart = pi
                         bestEnd = pj
+                        bestDist = d
                     }
                     break // first j that clears the threshold
                 }
@@ -86,9 +73,6 @@ struct FastestDistanceAnalyzer {
             return nil
         }
 
-        let dx = end.x - start.x
-        let dy = end.y - start.y
-        let d = sqrt(dx * dx + dy * dy)
         let dtIJ = end.ts - start.ts
 
         return FastestSegment(
@@ -98,7 +82,7 @@ struct FastestDistanceAnalyzer {
                 lat1: start.lat, lon1: start.lon,
                 lat2: end.lat,   lon2: end.lon
             ),
-            avgSpeedKmh: (d / dtIJ) * 3.6,
+            avgSpeedKmh: (bestDist / dtIJ) * 3.6,
             startCoord: CLLocationCoordinate2D(latitude: start.lat, longitude: start.lon),
             endCoord:   CLLocationCoordinate2D(latitude: end.lat,   longitude: end.lon),
             startTime:  Date(timeIntervalSince1970: start.ts),

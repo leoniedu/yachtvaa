@@ -16,9 +16,9 @@ final class AppSession: ObservableObject {
     @Published var errorMessage: String?
 
     // Filters (changes automatically re-filter all derived views)
-    @Published var filterStartHour: Int? = nil   // Bahia local hour, nil = no filter
-    @Published var filterEndHour:   Int? = nil
     @Published var analysisDistanceM: Double = AppConfig.analysisDistanceM
+    @Published var analysisStartTime: Date?     // nil = use all data (set to gpsStart/gpsEnd on load)
+    @Published var analysisEndTime:   Date?
 
     // Raw all-athlete data — do not read from views directly
     private var _allGpsRecords: [Int: [GPSRecord]] = [:] { willSet { objectWillChange.send() } }
@@ -26,21 +26,18 @@ final class AppSession: ObservableObject {
 
     // Computed filtered views — these are what views consume
 
-    /// Full-resolution GPS records filtered by selection + hour. Used for analysis.
+    /// Helper: filter records by the global time window.
+    private func timeFiltered(_ records: [GPSRecord]) -> [GPSRecord] {
+        guard let start = analysisStartTime, let end = analysisEndTime else { return records }
+        return records.filter { $0.ts >= start && $0.ts <= end }
+    }
+
+    /// Full-resolution GPS records filtered by selection + time window.
     var gpsRecordsByAthlete: [Int: [GPSRecord]] {
         let ids = selectedAthleteIDs
         return _allGpsRecords
             .filter { ids.contains($0.key) }
-            .mapValues { records in
-                guard filterStartHour != nil || filterEndHour != nil else { return records }
-                var cal = Calendar(identifier: .gregorian); cal.timeZone = AppConfig.timezone
-                return records.filter { r in
-                    let h = cal.component(.hour, from: r.ts)
-                    if let s = filterStartHour, h < s { return false }
-                    if let e = filterEndHour,   h > e { return false }
-                    return true
-                }
-            }
+            .mapValues { timeFiltered($0) }
     }
 
     /// One GPS record per minute per athlete. Used by the map to keep rendering fast.
@@ -53,18 +50,9 @@ final class AppSession: ObservableObject {
     /// All athlete IDs that have GPS data for the loaded date, regardless of selection.
     var allGpsAthleteIds: Set<Int> { Set(_allGpsRecords.keys) }
 
-    /// All GPS records for every athlete (ignores selection filter), but applies the hour filter.
+    /// All GPS records for every athlete (ignores selection filter), applies global time window.
     var allGpsRecords: [Int: [GPSRecord]] {
-        guard filterStartHour != nil || filterEndHour != nil else { return _allGpsRecords }
-        var cal = Calendar(identifier: .gregorian); cal.timeZone = AppConfig.timezone
-        return _allGpsRecords.mapValues { records in
-            records.filter { r in
-                let h = cal.component(.hour, from: r.ts)
-                if let s = filterStartHour, h < s { return false }
-                if let e = filterEndHour,   h > e { return false }
-                return true
-            }
-        }
+        _allGpsRecords.mapValues { timeFiltered($0) }
     }
 
     var conditionedSegments: [ConditionedSegment] {
@@ -452,6 +440,8 @@ final class AppSession: ObservableObject {
         let allRecords = grouped.values.flatMap { $0 }
         gpsStart = allRecords.map(\.ts).min()
         gpsEnd   = allRecords.map(\.ts).max()
+        analysisStartTime = gpsStart
+        analysisEndTime   = gpsEnd
 
         // 6. SISCORAR current grid
         loadingMessage = "Baixando correntes SISCORAR…"
@@ -485,9 +475,19 @@ final class AppSession: ObservableObject {
     }
 
     private func runAnalysis(on gpsData: [Int: [GPSRecord]]) {
+        // Apply time filter if set
+        let filtered: [Int: [GPSRecord]]
+        if let start = analysisStartTime, let end = analysisEndTime {
+            filtered = gpsData
+                .mapValues { $0.filter { $0.ts >= start && $0.ts <= end } }
+                .filter { !$0.value.isEmpty }
+        } else {
+            filtered = gpsData
+        }
+
         let analyzer = FastestDistanceAnalyzer(distanceM: analysisDistanceM)
         var fastestSegments: [FastestSegment] = []
-        for (_, records) in gpsData {
+        for (_, records) in filtered {
             if let seg = analyzer.run(records: records) { fastestSegments.append(seg) }
         }
 

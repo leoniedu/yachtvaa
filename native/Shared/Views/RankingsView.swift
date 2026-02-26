@@ -81,6 +81,18 @@ struct RankingsView: View {
                     .padding(.vertical, 6)
                     .background(.bar)
 
+                // Time filter (global — affects all tabs)
+                VStack(spacing: 2) {
+                    timePicker
+                    Text("Aplica-se a todas as abas.")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                }
+                .padding(.horizontal, Col.pad)
+                .padding(.vertical, 4)
+                .background(.bar)
+
                 Divider()
 
                 ScrollView {
@@ -101,6 +113,36 @@ struct RankingsView: View {
                 }
             }
             .background(Color(.systemGroupedBackground))
+        }
+    }
+
+    private var startTimeBinding: Binding<Date> {
+        Binding(
+            get: { session.analysisStartTime ?? session.gpsStart ?? Date() },
+            set: { session.analysisStartTime = $0; session.rerunAnalysis() }
+        )
+    }
+
+    private var endTimeBinding: Binding<Date> {
+        Binding(
+            get: { session.analysisEndTime ?? session.gpsEnd ?? Date() },
+            set: { session.analysisEndTime = $0; session.rerunAnalysis() }
+        )
+    }
+
+    private var timePicker: some View {
+        HStack {
+            Text("Horário")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            Spacer()
+            DatePicker("", selection: startTimeBinding, displayedComponents: .hourAndMinute)
+                .labelsHidden()
+                .environment(\.timeZone, AppConfig.timezone)
+            Text("–").foregroundStyle(.secondary)
+            DatePicker("", selection: endTimeBinding, displayedComponents: .hourAndMinute)
+                .labelsHidden()
+                .environment(\.timeZone, AppConfig.timezone)
         }
     }
 

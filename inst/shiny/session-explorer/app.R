@@ -293,7 +293,7 @@ server <- function(input, output, session) {
   # ---------------------------
   observeEvent(analysis_trigger(), {
     req(analysis_trigger() > 0)
-    req(rv$records_sf_bbox, rv$buoy_ip, rv$grib_cropped, rv$grib_data, rv$the_date)
+    req(rv$records_sf, rv$buoy_ip, rv$grib_cropped, rv$grib_data, rv$the_date)
 
     sel_ids <- as.integer(input$selected_athletes)
     req(length(sel_ids) > 0)
@@ -310,7 +310,7 @@ server <- function(input, output, session) {
         sprintf("%s %02d:59:59", rv$the_date, input$time_range[2]),
         tz = "America/Bahia"
       )
-      recs <- rv$records_sf_bbox |>
+      recs <- rv$records_sf |>
         dplyr::filter(
           id_athlete %in% sel_ids,
           timestamp >= start_t,
@@ -325,21 +325,6 @@ server <- function(input, output, session) {
         time_col    = "timestamp",
         distance_m  = input$distance_m
       )
-
-      if (nrow(rv$fastx) > 0) {
-        # Spatial filter: both endpoints inside study area
-        start_pts <- sf::st_as_sf(
-          rv$fastx, coords = c("start_x", "start_y"),
-          crs = sf::st_crs(rv$records_sf)
-        )
-        end_pts <- sf::st_as_sf(
-          rv$fastx, coords = c("end_x", "end_y"),
-          crs = sf::st_crs(rv$records_sf)
-        )
-        in_bbox <- lengths(sf::st_intersects(start_pts, rv$study_area)) > 0 &
-          lengths(sf::st_intersects(end_pts, rv$study_area)) > 0
-        rv$fastx <- rv$fastx[in_bbox, ]
-      }
 
       # Join athlete names
       rv$fastx <- rv$fastx |>

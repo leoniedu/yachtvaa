@@ -256,24 +256,19 @@ actor TreinusClient {
     // MARK: - Cookie helpers (mirrors R's vapply + paste(collapse="; "))
 
     /// Extracts `name=value` pairs from the Set-Cookie response header.
-    /// `allHeaderFields` collapses multiple Set-Cookie values with ", " — safe for
-    /// ASP.NET cookies whose values (Base64/hex) never contain commas.
+    /// Uses HTTPCookie for correct parsing (handles Expires dates that contain commas).
     private func extractCookieString(from response: HTTPURLResponse) -> String {
-        guard let combined = response.allHeaderFields["Set-Cookie"] as? String,
-              !combined.isEmpty
-        else {
+        guard let url = response.url else { return "" }
+        let headers = response.allHeaderFields as? [String: String] ?? [:]
+        let cookies = HTTPCookie.cookies(withResponseHeaderFields: headers, for: url)
+        guard !cookies.isEmpty else {
             // Fall back to anything the session's cookie jar already has.
             return session.configuration.httpCookieStorage?
-                .cookies(for: response.url ?? baseURL)?
+                .cookies(for: url)?
                 .map { "\($0.name)=\($0.value)" }
                 .joined(separator: "; ") ?? ""
         }
-        // Each "Set-Cookie: name=value; attr1; attr2" separated by ", " between cookies.
-        return combined
-            .components(separatedBy: ", ")
-            .map { $0.components(separatedBy: ";")[0].trimmingCharacters(in: .whitespaces) }
-            .filter { $0.contains("=") }
-            .joined(separator: "; ")
+        return cookies.map { "\($0.name)=\($0.value)" }.joined(separator: "; ")
     }
 
     /// Resolves a relative or absolute Location header to a full URL.

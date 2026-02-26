@@ -245,12 +245,12 @@ struct ExerciseStore {
             if let name = analysis.athleteName, !name.isEmpty {
                 try db.execute(sql: """
                     INSERT INTO athletes (id, team_id, full_name, synced_at)
-                    VALUES (?, ?, ?, CAST(strftime('%s','now') AS REAL))
+                    VALUES (?, ?, ?, ?)
                     ON CONFLICT(id) DO UPDATE
                       SET full_name = excluded.full_name,
                           synced_at = excluded.synced_at
                       WHERE athletes.full_name LIKE '#%'
-                    """, arguments: [analysis.athleteId, teamId, name])
+                    """, arguments: [analysis.athleteId, teamId, name, Date().timeIntervalSinceReferenceDate])
             }
         }
     }

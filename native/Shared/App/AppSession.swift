@@ -291,6 +291,7 @@ final class AppSession: ObservableObject {
             await withTaskGroup(of: Void.self) { group in
                 for id in allIds {
                     group.addTask {
+                        guard !Task.isCancelled else { return }
                         guard let exs = try? await self.client.getExercises(athleteId: id, teamId: teamId)
                         else { return }
                         try? await self.exerciseStore.upsertExercises(exs)
@@ -336,9 +337,11 @@ final class AppSession: ObservableObject {
                 }
                 inflight += 1
                 group.addTask {
+                    guard !Task.isCancelled else { return }
                     let needsAnalysis = (try? await self.exerciseStore.hasAnalysis(exerciseId: row.id, athleteId: row.athleteId, teamId: teamId)) == false
                     let needsName     = placeholders.contains(row.athleteId)
                     guard needsAnalysis || needsName else { return }
+                    guard !Task.isCancelled else { return }
                     guard let analysis = try? await self.client.getExerciseAnalysis(
                         exerciseId: row.id, athleteId: row.athleteId, teamId: teamId
                     ) else { return }

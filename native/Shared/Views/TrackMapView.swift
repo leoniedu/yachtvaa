@@ -122,8 +122,13 @@ struct TrackMapView: View {
         cal.timeZone = TimeZone(identifier: "UTC")!
         let utcHour = cal.component(.hour, from: currentMapTime)
         return hoursUTC.indices.min {
-            abs(hoursUTC[$0] - utcHour) < abs(hoursUTC[$1] - utcHour)
+            circularHourDist(hoursUTC[$0], utcHour) < circularHourDist(hoursUTC[$1], utcHour)
         } ?? 0
+    }
+
+    private func circularHourDist(_ a: Int, _ b: Int) -> Int {
+        let d = abs(a - b)
+        return min(d, 24 - d)
     }
 
     // MARK: - Time slider bar

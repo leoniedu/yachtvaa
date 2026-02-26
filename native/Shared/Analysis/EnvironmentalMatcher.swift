@@ -61,7 +61,7 @@ enum EnvironmentalMatcher {
 
         return segments.map { seg in
             let t = seg.segment.startTime
-            let nearest = sorted.min { abs($0.ts.timeIntervalSince(t)) < abs($1.ts.timeIntervalSince(t)) }
+            let nearest = binaryNearestReading(sorted, to: t)
             guard let r = nearest, abs(r.ts.timeIntervalSince(t)) <= maxGap else { return seg }
             return ConditionedSegment(
                 segment: seg.segment,
@@ -114,11 +114,11 @@ enum EnvironmentalMatcher {
     }
 
     /// SISCORAR grid step in degrees, derived from AppConfig.geojsonResolutionCode.
-    /// "005" → 0.005°
+    /// "005" → 0.005°  (Double("005") = 5, code.count = 3, so 5 / 10^3 = 0.005)
     private static func gridStep() -> Double {
         let code = AppConfig.geojsonResolutionCode
         if let n = Double(code), code.count > 0 {
-            return n / pow(10.0, Double(code.count - 1))
+            return n / pow(10.0, Double(code.count))
         }
         return 0.005
     }
@@ -161,12 +161,34 @@ enum EnvironmentalMatcher {
         return (uOut, vOut)
     }
 
+    /// O(log n) nearest-time lookup in a sorted array of buoy readings.
+    private static func binaryNearestReading(_ sorted: [BuoyReading], to t: Date) -> BuoyReading? {
+        guard !sorted.isEmpty else { return nil }
+        var lo = 0, hi = sorted.count - 1
+        while lo < hi {
+            let mid = (lo + hi) / 2
+            if sorted[mid].ts < t { lo = mid + 1 } else { hi = mid }
+        }
+        // lo is the first reading >= t; check lo and lo-1 for nearest.
+        if lo == 0 { return sorted[0] }
+        if lo == sorted.count { return sorted[sorted.count - 1] }
+        let dBefore = abs(sorted[lo - 1].ts.timeIntervalSince(t))
+        let dAfter  = abs(sorted[lo].ts.timeIntervalSince(t))
+        return dBefore <= dAfter ? sorted[lo - 1] : sorted[lo]
+    }
+
     private static func nearestHourIndex(time: Date, hoursUTC: [Int]) -> Int? {
         guard !hoursUTC.isEmpty else { return nil }
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = TimeZone(identifier: "UTC")!
         let hour = cal.component(.hour, from: time)
-        return hoursUTC.indices.min { abs(hoursUTC[$0] - hour) < abs(hoursUTC[$1] - hour) }
+        return hoursUTC.indices.min { circularDist(hoursUTC[$0], hour) < circularDist(hoursUTC[$1], hour) }
+    }
+
+    /// Circular distance between two hours (handles midnight wrapping).
+    private static func circularDist(_ a: Int, _ b: Int) -> Int {
+        let d = abs(a - b)
+        return min(d, 24 - d)
     }
 }
 

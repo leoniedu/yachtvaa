@@ -155,6 +155,23 @@ struct ExerciseStore {
         }
     }
 
+    /// Returns all GPS records for a single athlete across all dates, filtered to the BTS bbox.
+    /// Used by PRBoardComputer to find all-time personal records.
+    func fetchAllRecordsInBbox(athleteId: Int,
+                               latMin: Int, latMax: Int,
+                               lonMin: Int, lonMax: Int) async throws -> [RecordRow] {
+        try await dbQueue.read { db in
+            try RecordRow.fetchAll(db, sql: """
+                SELECT * FROM records
+                WHERE athlete_id = ?
+                  AND position_lat IS NOT NULL
+                  AND position_lat >= ? AND position_lat <= ?
+                  AND position_lon >= ? AND position_lon <= ?
+                ORDER BY exercise_id, ts
+                """, arguments: [athleteId, latMin, latMax, lonMin, lonMax])
+        }
+    }
+
     /// Returns raw GPS rows for an athlete set within a Unix-second time window.
     func fetchRecords(athleteIds: [Int], from: Int, to: Int) async throws -> [RecordRow] {
         try await dbQueue.read { db in
@@ -183,6 +200,47 @@ struct ExerciseStore {
     }
 
     // MARK: - Write
+
+    /// Upserts the last ~50 exercises from GetLastExerciseDone for one athlete,
+    /// then prunes local exercises that are within the response window on BOTH axes
+    /// (id >= minReturnedId AND start >= minReturnedStart) but absent from the response.
+    /// CASCADE on analysis_raw/records handles cleanup automatically.
+    func syncExercises(_ exercises: [TreinusExercise], athleteId: Int, teamId: Int) async throws {
+        guard !exercises.isEmpty else { return }
+        let rows = exercises.map { ex -> ExerciseRow in
+            ExerciseRow(
+                id: ex.id,
+                athleteId: ex.athleteId,
+                teamId: ex.teamId,
+                genreName: ex.genreName,
+                start: ex.start ?? "",
+                distanceM: ex.distanceM,
+                elapsedSec: ex.totalElapsedTimeSec,
+                extraJson: jsonString(ex.rawJSON)
+            )
+        }
+        let liveIds = exercises.map(\.id)
+        let minId = liveIds.min()!
+        let minStart = rows.map(\.start).min() ?? ""
+        try await dbQueue.write { db in
+            for row in rows {
+                try row.save(db)
+            }
+            let placeholders = liveIds.map { _ in "?" }.joined(separator: ",")
+            var args: [DatabaseValueConvertible] = [athleteId, teamId, minId, minStart]
+            args.append(contentsOf: liveIds)
+            try db.execute(
+                sql: """
+                    DELETE FROM exercises
+                    WHERE athlete_id = ? AND team_id = ?
+                      AND id >= ?
+                      AND start >= ?
+                      AND id NOT IN (\(placeholders))
+                    """,
+                arguments: StatementArguments(args)
+            )
+        }
+    }
 
     /// Upserts exercise metadata. Does not overwrite analysis_raw or records.
     func upsertExercises(_ exercises: [TreinusExercise]) async throws {

@@ -97,6 +97,27 @@ struct BuoyStore {
         }
     }
 
+    /// Returns buoy observations ±windowSec around a Unix timestamp.
+    /// Used by PRBoardComputer to match environmental data to individual PR segments.
+    func fetchObservationsNear(
+        boiaId: Int = AppConfig.buoyID,
+        ts: Int,
+        windowSec: Int = 7200
+    ) async throws -> [BuoyObservation] {
+        try await dbQueue.read { db in
+            try BuoyObservation.fetchAll(
+                db,
+                sql: """
+                    SELECT * FROM buoy_observations
+                    WHERE boia_id = ? AND endpoint = 'standard'
+                      AND ts BETWEEN ? AND ?
+                    ORDER BY ts, variable
+                    """,
+                arguments: [boiaId, ts - windowSec, ts + windowSec]
+            )
+        }
+    }
+
     // MARK: - Write
 
     /// Bulk-inserts (or replaces) observations and appends a coverage window.

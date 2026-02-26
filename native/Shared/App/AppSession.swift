@@ -294,7 +294,7 @@ final class AppSession: ObservableObject {
                         guard !Task.isCancelled else { return }
                         guard let exs = try? await self.client.getExercises(athleteId: id, teamId: teamId)
                         else { return }
-                        try? await self.exerciseStore.upsertExercises(exs)
+                        try? await self.exerciseStore.syncExercises(exs, athleteId: id, teamId: teamId)
                     }
                 }
             }
@@ -368,7 +368,7 @@ final class AppSession: ObservableObject {
                     group.addTask {
                         guard let exs = try? await self.client.getExercises(athleteId: id, teamId: teamId)
                         else { return }
-                        try? await self.exerciseStore.upsertExercises(exs)
+                        try? await self.exerciseStore.syncExercises(exs, athleteId: id, teamId: teamId)
                     }
                 }
             }
@@ -535,15 +535,18 @@ final class AppSession: ObservableObject {
             // for the most recent exercises. One-time wait; makes app immediately useful.
             loadingMessage = "Baixando listas de exercícios…"
             var allExercises: [TreinusExercise] = []
-            await withTaskGroup(of: [TreinusExercise].self) { group in
+            await withTaskGroup(of: (Int, [TreinusExercise]).self) { group in
                 for id in ids {
                     group.addTask {
-                        (try? await self.client.getExercises(athleteId: id, teamId: teamId)) ?? []
+                        let exs = (try? await self.client.getExercises(athleteId: id, teamId: teamId)) ?? []
+                        return (id, exs)
                     }
                 }
-                for await exs in group { allExercises.append(contentsOf: exs) }
+                for await (athleteId, exs) in group {
+                    try? await exerciseStore.syncExercises(exs, athleteId: athleteId, teamId: teamId)
+                    allExercises.append(contentsOf: exs)
+                }
             }
-            try await exerciseStore.upsertExercises(allExercises)
 
             let bootstrapCount = 10
             loadingMessage = "Baixando GPS dos últimos \(bootstrapCount) exercícios por atleta…"

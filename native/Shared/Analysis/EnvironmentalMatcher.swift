@@ -124,6 +124,7 @@ enum EnvironmentalMatcher {
     }
 
     /// Inverse-distance–weighted interpolation from the 4 surrounding grid cells.
+    /// Falls back to the nearest water cell within ±2 steps if all 4 corners are land.
     private static func interpolateUV(
         lat: Double, lon: Double,
         step: Double, hIdx: Int,
@@ -154,7 +155,32 @@ enum EnvironmentalMatcher {
             uVals.append(u); vVals.append(v); wts.append(1 / dist)
         }
 
-        guard !uVals.isEmpty else { return (nil, nil) }
+        // Fallback: if all 4 corners are land, find the nearest water cell within ±2 steps.
+        if uVals.isEmpty {
+            let qLat = quantize(lat, step: step)
+            let qLon = quantize(lon, step: step)
+            var bestDist = Double.infinity
+            var bestU: Double?
+            var bestV: Double?
+            for dLat in -2...2 {
+                for dLon in -2...2 {
+                    let cLat = qLat + Double(dLat) * step
+                    let cLon = qLon + Double(dLon) * step
+                    let key = LatLonKey(lat: quantize(cLat, step: step),
+                                        lon: quantize(cLon, step: step))
+                    guard let pt = lookup[key],
+                          hIdx < pt.u.count, hIdx < pt.v.count,
+                          let u = pt.u[hIdx], let v = pt.v[hIdx]
+                    else { continue }
+                    let dist = sqrt(pow(lat - cLat, 2) + pow(lon - cLon, 2))
+                    if dist < bestDist {
+                        bestDist = dist; bestU = u; bestV = v
+                    }
+                }
+            }
+            return (bestU, bestV)
+        }
+
         let wSum = wts.reduce(0, +)
         let uOut = zip(uVals, wts).reduce(0.0) { $0 + $1.0 * $1.1 } / wSum
         let vOut = zip(vVals, wts).reduce(0.0) { $0 + $1.0 * $1.1 } / wSum

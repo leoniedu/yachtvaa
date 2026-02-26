@@ -137,26 +137,35 @@ struct AthletesView: View {
     // MARK: - Athlete row
 
     private func athleteRow(_ athlete: Athlete) -> some View {
-        HStack(alignment: .center) {
-            Image(systemName: "person.circle")
-                .foregroundStyle(.tint)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(athlete.fullName)
-                    .font(.body)
-                if let s = stats(for: athlete.id) {
-                    Text(athleteStatsLine(s))
-                        .font(.caption.monospacedDigit())
-                        .foregroundStyle(.secondary)
+        NavigationLink {
+            PRBoardView(
+                athlete: athlete,
+                exerciseStore: session.exerciseStore,
+                buoyStore: session.buoyStore
+            )
+        } label: {
+            HStack(alignment: .center) {
+                Button {
+                    toggleSelection(athlete.id)
+                } label: {
+                    Image(systemName: session.selectedAthleteIDs.contains(athlete.id)
+                          ? "checkmark.circle.fill" : "circle")
+                        .foregroundStyle(session.selectedAthleteIDs.contains(athlete.id)
+                                         ? Color.accentColor : Color.secondary)
+                }
+                .buttonStyle(.plain)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(athlete.fullName)
+                        .font(.body)
+                    if let s = stats(for: athlete.id) {
+                        Text(athleteStatsLine(s))
+                            .font(.caption.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
-            Spacer()
-            if session.selectedAthleteIDs.contains(athlete.id) {
-                Image(systemName: "checkmark")
-                    .foregroundStyle(.tint)
-            }
         }
-        .contentShape(Rectangle())
-        .onTapGesture { toggleSelection(athlete.id) }
     }
 
     private func athleteStatsLine(_ s: AthleteStats) -> String {

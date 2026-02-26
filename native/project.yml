@@ -1,0 +1,78 @@
+name: YachtVAA
+
+options:
+  bundleIdPrefix: com.eleon
+  deploymentTarget:
+    iOS: "17.0"
+  minimumXcodeGenVersion: "2.40.0"
+
+packages:
+  SwiftSoup:
+    url: https://github.com/scinfu/SwiftSoup.git
+    from: 2.7.0
+  GRDB:
+    url: https://github.com/groue/GRDB.swift.git
+    from: 6.0.0
+  KeychainAccess:
+    url: https://github.com/kishikawakatsumi/KeychainAccess.git
+    from: 4.2.2
+
+targets:
+  YachtVAA:
+    type: application
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: Shared
+      - path: YachtVAA
+        excludes:
+          - "**/*.entitlements"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.eleon.yachtvaa
+        PRODUCT_NAME: YachtVAA
+        INFOPLIST_FILE: YachtVAA/Info.plist
+        CODE_SIGN_ENTITLEMENTS: YachtVAA/YachtVAA.entitlements
+        SUPPORTS_MACCATALYST: YES
+        DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER: YES
+        TARGETED_DEVICE_FAMILY: "1,2"
+        SWIFT_VERSION: "5.9"
+        "MACOSX_DEPLOYMENT_TARGET[sdk=macosx*]": "14.0"
+        CODE_SIGN_STYLE: Automatic
+
+    dependencies:
+      - package: SwiftSoup
+        product: SwiftSoup
+      - package: GRDB
+        product: GRDB
+      - package: KeychainAccess
+        product: KeychainAccess
+
+  YachtVAATests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - YachtVAATests
+    dependencies:
+      - target: YachtVAA
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.eleon.yachtvaa.tests
+        SWIFT_VERSION: "5.9"
+
+schemes:
+  YachtVAA:
+    build:
+      targets:
+        YachtVAA: all
+        YachtVAATests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - name: YachtVAATests
+          parallelizable: true
+    archive:
+      config: Release

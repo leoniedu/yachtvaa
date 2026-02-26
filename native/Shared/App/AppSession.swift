@@ -1,0 +1,517 @@
+import Foundation
+import GRDB
+
+/// Central state manager — drives all 6 tab views.
+@MainActor
+final class AppSession: ObservableObject {
+
+    // MARK: - Published state
+
+    @Published var isLoggedIn: Bool
+    @Published var selectedDate = Date()
+    @Published var athletes: [Athlete] = []
+    @Published var selectedAthleteIDs: Set<Int> = []
+    @Published var isLoading = false
+    @Published var loadingMessage = ""
+    @Published var errorMessage: String?
+
+    // Filters (changes automatically re-filter all derived views)
+    @Published var filterStartHour: Int? = nil   // Bahia local hour, nil = no filter
+    @Published var filterEndHour:   Int? = nil
+    @Published var analysisDistanceM: Double = AppConfig.analysisDistanceM
+
+    // Raw all-athlete data — do not read from views directly
+    private var _allGpsRecords: [Int: [GPSRecord]] = [:] { willSet { objectWillChange.send() } }
+    private var _allConditionedSegments: [ConditionedSegment] = [] { willSet { objectWillChange.send() } }
+
+    // Computed filtered views — these are what views consume
+
+    /// Full-resolution GPS records filtered by selection + hour. Used for analysis.
+    var gpsRecordsByAthlete: [Int: [GPSRecord]] {
+        let ids = selectedAthleteIDs
+        return _allGpsRecords
+            .filter { ids.contains($0.key) }
+            .mapValues { records in
+                guard filterStartHour != nil || filterEndHour != nil else { return records }
+                var cal = Calendar(identifier: .gregorian); cal.timeZone = AppConfig.timezone
+                return records.filter { r in
+                    let h = cal.component(.hour, from: r.ts)
+                    if let s = filterStartHour, h < s { return false }
+                    if let e = filterEndHour,   h > e { return false }
+                    return true
+                }
+            }
+    }
+
+    /// One GPS record per minute per athlete. Used by the map to keep rendering fast.
+    var mapGpsRecordsByAthlete: [Int: [GPSRecord]] {
+        gpsRecordsByAthlete.mapValues { records in
+            var seen = Set<Int>()
+            return records.filter { seen.insert(Int($0.ts.timeIntervalSince1970) / 60).inserted }
+        }
+    }
+    /// All athlete IDs that have GPS data for the loaded date, regardless of selection.
+    var allGpsAthleteIds: Set<Int> { Set(_allGpsRecords.keys) }
+
+    var conditionedSegments: [ConditionedSegment] {
+        _allConditionedSegments.filter { selectedAthleteIDs.contains($0.segment.athleteID) }
+    }
+    var leagueEntries: [LeagueEntry] {
+        let dict = Dictionary(uniqueKeysWithValues: athletes.map { ($0.id, $0) })
+        return LeagueBuilder.build(segments: conditionedSegments, athletes: dict)
+    }
+
+    @Published var exerciseAthleteIds: Set<Int> = []
+    @Published var gpsStart: Date? = nil   // from ALL bbox athletes, used for animation/SIMCOSTA
+    @Published var gpsEnd:   Date? = nil
+    @Published var buoyReadings: [BuoyReading] = []
+    @Published var currentGrid: CurrentGrid?
+
+    // MARK: - Stores
+
+    let client = TreinusClient.shared
+    let athleteStore = AthleteStore(dbQueue: AppDatabase.shared.dbQueue)
+    let exerciseStore = ExerciseStore(dbQueue: AppDatabase.shared.dbQueue)
+    let buoyStore = BuoyStore(dbQueue: AppDatabase.shared.dbQueue)
+
+    /// Keeps the athletes table observation alive.
+    private var athleteObservation: AnyDatabaseCancellable?
+
+    /// Single background-sync task. Cancelled before any foreground pipeline run.
+    private var backgroundSyncTask: Task<Void, Never>?
+    /// In-flight foreground load task. Cancelled when a new load starts.
+    private var loadTask: Task<Void, Never>?
+
+    // MARK: - Init
+
+    init() {
+        isLoggedIn = CredentialManager.hasCredentials
+        if let teamId = CredentialManager.load()?.teamId {
+            // Synchronous pre-load for immediate display on launch.
+            athletes = (try? AppDatabase.shared.dbQueue.read { db in
+                try Athlete
+                    .filter(Column("team_id") == teamId)
+                    .order(Column("id"))
+                    .fetchAll(db)
+            }) ?? []
+            selectedAthleteIDs = Set(athletes.map(\.id))
+            startObservingAthletes(teamId: teamId)
+        }
+    }
+
+    /// Starts a live observation of the athletes table for the given team.
+    /// Any write to the table (from runPipeline, backgroundSync, etc.) automatically
+    /// pushes an updated list to `athletes` on the main queue.
+    private func startObservingAthletes(teamId: Int) {
+        athleteObservation = ValueObservation
+            .tracking { db in
+                try Athlete
+                    .filter(Column("team_id") == teamId)
+                    .order(Column("id"))
+                    .fetchAll(db)
+            }
+            .start(
+                in: AppDatabase.shared.dbQueue,
+                scheduling: .async(onQueue: .main),
+                onError: { _ in },
+                onChange: { [weak self] updated in
+                    guard let self else { return }
+                    let prev = self.athletes
+                    self.athletes = updated
+                    // Auto-select any newly discovered athletes
+                    let newIds = Set(updated.map(\.id)).subtracting(Set(prev.map(\.id)))
+                    self.selectedAthleteIDs.formUnion(newIds)
+                }
+            )
+    }
+
+    // MARK: - Authentication
+
+    func login(email: String, password: String, teamId: Int?) async {
+        isLoading = true
+        loadingMessage = "Entrando no Treinus…"
+        errorMessage = nil
+        defer { isLoading = false }
+        do {
+            try await client.login(email: email, password: password, teamId: teamId)
+            try CredentialManager.save(email: email, password: password, teamId: teamId)
+            isLoggedIn = true
+            if let tid = teamId { startObservingAthletes(teamId: tid) }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    /// Silently re-authenticates on launch using saved credentials.
+    func autoLogin() async {
+        guard let creds = CredentialManager.load() else { return }
+        do {
+            try await client.login(
+                email: creds.email,
+                password: creds.password,
+                teamId: creds.teamId
+            )
+        } catch {
+            // Stale credentials — user sees error when they tap "Carregar"
+        }
+    }
+
+    func logout() {
+        loadTask?.cancel()
+        loadTask = nil
+        backgroundSyncTask?.cancel()
+        backgroundSyncTask = nil
+        athleteObservation = nil   // stop watching
+        try? CredentialManager.clear()
+        isLoggedIn = false
+        athletes = []
+        selectedAthleteIDs = []
+        _allGpsRecords = [:]
+        _allConditionedSegments = []
+        exerciseAthleteIds = []
+        gpsStart = nil; gpsEnd = nil
+        buoyReadings = []
+        currentGrid = nil
+    }
+
+    // MARK: - Data loading
+
+    /// Load from DB + download conditions; does NOT call Treinus API.
+    /// After loading, kicks off a silent background sync to keep the cache warm.
+    /// Safe to call concurrently — cancels any in-flight load first.
+    func loadFromCache() {
+        loadTask?.cancel()
+        loadTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            guard let teamId = await client.authenticatedTeamId else {
+                errorMessage = "Faça login primeiro."
+                return
+            }
+            backgroundSyncTask?.cancel()
+            backgroundSyncTask = nil
+            isLoading = true
+            loadingMessage = "Carregando do banco…"
+            errorMessage = nil
+            defer {
+                isLoading = false
+                backgroundSyncTask = Task.detached(priority: .background) { [weak self] in
+                    await self?.backgroundSync()
+                }
+            }
+            do { try await runPipeline(teamId: teamId, syncTreinus: false) }
+            catch { if !(error is CancellationError) { errorMessage = error.localizedDescription } }
+        }
+    }
+
+    /// Sync exercises + GPS analysis from Treinus, then run the full pipeline.
+    func syncWithTreinus() {
+        loadTask?.cancel()
+        loadTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            guard let teamId = await client.authenticatedTeamId else {
+                errorMessage = "Faça login primeiro."
+                return
+            }
+            backgroundSyncTask?.cancel()
+            backgroundSyncTask = nil
+            isLoading = true
+            loadingMessage = "Sincronizando com Treinus…"
+            errorMessage = nil
+            defer {
+                isLoading = false
+                backgroundSyncTask = Task.detached(priority: .background) { [weak self] in
+                    await self?.backgroundSync()
+                }
+            }
+            do { try await runPipeline(teamId: teamId, syncTreinus: true) }
+            catch { if !(error is CancellationError) { errorMessage = error.localizedDescription } }
+        }
+    }
+
+    /// Silently fetches exercises + GPS analysis for all known athletes, all dates.
+    /// Does not touch isLoading or errorMessage — runs fully in background.
+    func backgroundSync() async {
+        guard let teamId = await client.authenticatedTeamId else { return }
+        let knownAthletes = (try? await athleteStore.fetchAll(teamId: teamId)) ?? []
+        guard !knownAthletes.isEmpty else { return }
+        let allIds = knownAthletes.map(\.id)
+
+        // Fetch & cache exercise lists from Treinus for all athletes
+        await withTaskGroup(of: Void.self) { group in
+            for id in allIds {
+                group.addTask {
+                    guard let exs = try? await self.client.getExercises(athleteId: id, teamId: teamId)
+                    else { return }
+                    try? await self.exerciseStore.upsertExercises(exs)
+                }
+            }
+        }
+
+        // Priority: download GPS analysis for the selected date first
+        let dayExercises = (try? await exerciseStore.fetchExercises(
+            athleteIds: allIds, datePrefix: bahiaDayPrefix(selectedDate)
+        )) ?? []
+        await downloadMissingAnalysis(for: dayExercises, teamId: teamId)
+
+        // (athletes list is kept current by the ValueObservation — no manual refresh needed)
+
+        // Then fill the ±1 month window around the selected date (capped at today)
+        let cal = Calendar.current
+        let windowStart = cal.date(byAdding: .month, value: -1, to: selectedDate) ?? selectedDate
+        let windowEnd   = min(cal.date(byAdding: .month, value: 1, to: selectedDate) ?? selectedDate, Date())
+        let windowExercises = (try? await exerciseStore.fetchExercisesInRange(
+            athleteIds: allIds, from: bahiaDayPrefix(windowStart), to: bahiaDayPrefix(windowEnd)
+        )) ?? []
+        let dayKeys = Set(dayExercises.map { "\($0.id)-\($0.athleteId)-\($0.teamId)" })
+        await downloadMissingAnalysis(for: windowExercises.filter { !dayKeys.contains("\($0.id)-\($0.athleteId)-\($0.teamId)") }, teamId: teamId)
+    }
+
+    private func downloadMissingAnalysis(for exercises: [ExerciseRow], teamId: Int) async {
+        // Capture on main actor before entering the concurrent task group.
+        let placeholders = Set(athletes.filter { $0.fullName.hasPrefix("#") }.map(\.id))
+        await withTaskGroup(of: Void.self) { group in
+            for row in exercises {
+                group.addTask {
+                    let needsAnalysis = (try? await self.exerciseStore.hasAnalysis(exerciseId: row.id, athleteId: row.athleteId, teamId: teamId)) == false
+                    let needsName     = placeholders.contains(row.athleteId)
+                    guard needsAnalysis || needsName else { return }
+                    guard let analysis = try? await self.client.getExerciseAnalysis(
+                        exerciseId: row.id, athleteId: row.athleteId, teamId: teamId
+                    ) else { return }
+                    // upsertAnalysis writes GPS records and athlete name in one transaction
+                    try? await self.exerciseStore.upsertAnalysis(analysis, teamId: teamId)
+                }
+            }
+        }
+    }
+
+    private func runPipeline(teamId: Int, syncTreinus: Bool) async throws {
+        // Use ALL known athletes so in-memory selection filter always works without reload.
+        let athleteIds = athletes.isEmpty ? Array(selectedAthleteIDs) : athletes.map(\.id)
+
+        // 1. Always refresh exercise lists — lightweight metadata, keeps DB current for any date.
+        //    Errors are swallowed so loadFromCache still works offline.
+        loadingMessage = "Sincronizando exercícios…"
+        await withTaskGroup(of: Void.self) { group in
+            for id in athleteIds {
+                group.addTask {
+                    guard let exs = try? await self.client.getExercises(athleteId: id, teamId: teamId)
+                    else { return }
+                    try? await self.exerciseStore.upsertExercises(exs)
+                }
+            }
+        }
+
+        // 2. Fetch exercises for selected date ±1 day (GPS timestamps are source of truth,
+        //    exercise list just drives which analyses to download).
+        var dayCal = Calendar(identifier: .gregorian); dayCal.timeZone = AppConfig.timezone
+        let dayBefore = dayCal.date(byAdding: .day, value: -1, to: selectedDate)!
+        let dayAfter  = dayCal.date(byAdding: .day, value:  1, to: selectedDate)!
+        let windowRows = try await exerciseStore.fetchExercisesInRange(
+            athleteIds: athleteIds,
+            from: bahiaDayPrefix(dayBefore),
+            to:   bahiaDayPrefix(dayAfter)
+        )
+
+        if syncTreinus {
+            // 4. Download missing analysis for window exercises (writes records + name atomically)
+            loadingMessage = "Baixando análises GPS…"
+            try await withThrowingTaskGroup(of: Void.self) { group in
+                for row in windowRows {
+                    group.addTask {
+                        guard !(try await self.exerciseStore.hasAnalysis(exerciseId: row.id, athleteId: row.athleteId, teamId: teamId))
+                        else { return }
+                        let analysis = try await self.client.getExerciseAnalysis(
+                            exerciseId: row.id, athleteId: row.athleteId, teamId: teamId
+                        )
+                        try await self.exerciseStore.upsertAnalysis(analysis, teamId: teamId)
+                    }
+                }
+                try await group.waitForAll()
+            }
+        }
+
+        // 5. GPS records: SQL bbox+time filter → only athletes in the water today, fast
+        loadingMessage = "Carregando GPS…"
+        var cal = Calendar(identifier: .gregorian); cal.timeZone = AppConfig.timezone
+        let dayStart = cal.startOfDay(for: selectedDate)
+        let dayEnd   = cal.date(byAdding: .day, value: 1, to: dayStart)!.addingTimeInterval(-1)
+        let fromTs   = Int(dayStart.timeIntervalSince1970)
+        let toTs     = Int(dayEnd.timeIntervalSince1970)
+
+        let bboxAthleteIds = try await exerciseStore.fetchAthleteIdsInBbox(
+            from: fromTs, to: toTs,
+            latMin: AppConfig.toSemicircle(AppConfig.bboxSSA.minLat),
+            latMax: AppConfig.toSemicircle(AppConfig.bboxSSA.maxLat),
+            lonMin: AppConfig.toSemicircle(AppConfig.bboxSSA.minLon),
+            lonMax: AppConfig.toSemicircle(AppConfig.bboxSSA.maxLon)
+        )
+        guard !bboxAthleteIds.isEmpty else {
+            _allGpsRecords = [:]
+            _allConditionedSegments = []
+            gpsStart = nil; gpsEnd = nil
+            return
+        }
+
+        let recordRows = try await exerciseStore.fetchRecords(
+            athleteIds: bboxAthleteIds, from: fromTs, to: toTs
+        )
+        var grouped: [Int: [GPSRecord]] = [:]
+        for row in recordRows {
+            guard let lat = row.positionLat, let lon = row.positionLon else { continue }
+            grouped[row.athleteId, default: []].append(GPSRecord(
+                exerciseID: row.exerciseId, athleteID: row.athleteId,
+                ts: Date(timeIntervalSince1970: Double(row.ts)),
+                positionLat: lat, positionLon: lon,
+                distanceM: row.distanceM, speedMps: row.speedMps, heartRate: row.heartRate
+            ))
+        }
+        guard !grouped.isEmpty else {
+            _allGpsRecords = [:]
+            _allConditionedSegments = []
+            gpsStart = nil; gpsEnd = nil
+            return
+        }
+
+        // Athletes are now known — update state before any slow network calls
+        exerciseAthleteIds = Set(grouped.keys)
+        _allGpsRecords = grouped
+
+        let allRecords = grouped.values.flatMap { $0 }
+        gpsStart = allRecords.map(\.ts).min()
+        gpsEnd   = allRecords.map(\.ts).max()
+
+        // 6. SISCORAR current grid
+        loadingMessage = "Baixando correntes SISCORAR…"
+        do { currentGrid = try await CurrentDataClient.shared.fetchGrid(for: selectedDate) }
+        catch { currentGrid = nil }
+
+        // 7. SIMCOSTA buoy readings — expand to floor(hour)-1 … floor(hour)+2 so on-the-hour
+        //    readings at the edges of the session are never missed.
+        loadingMessage = "Buscando dados da boia…"
+        if let s = gpsStart, let e = gpsEnd {
+            var hCal = Calendar(identifier: .gregorian); hCal.timeZone = AppConfig.timezone
+            let floorStart = hCal.date(from: hCal.dateComponents([.year,.month,.day,.hour], from: s))!
+            let floorEnd   = hCal.date(from: hCal.dateComponents([.year,.month,.day,.hour], from: e))!
+            let fetchFrom  = hCal.date(byAdding: .hour, value: -1, to: floorStart)!
+            let fetchTo    = hCal.date(byAdding: .hour, value:  2, to: floorEnd)!
+            do { buoyReadings = try await SimcostaClient.shared.fetchReadings(from: fetchFrom, to: fetchTo, store: buoyStore) }
+            catch { buoyReadings = [] }
+        } else {
+            buoyReadings = []
+        }
+
+        // 8-10. Analysis (fastest segment → env matching → league table)
+        loadingMessage = "Calculando tempos…"
+        runAnalysis(on: grouped)
+    }
+
+    /// Re-runs steps 8-10 in-memory (no network) — called when analysisDistanceM changes.
+    func rerunAnalysis() {
+        guard !_allGpsRecords.isEmpty else { return }
+        runAnalysis(on: _allGpsRecords)
+    }
+
+    private func runAnalysis(on gpsData: [Int: [GPSRecord]]) {
+        let analyzer = FastestDistanceAnalyzer(distanceM: analysisDistanceM)
+        var fastestSegments: [FastestSegment] = []
+        for (_, records) in gpsData {
+            if let seg = analyzer.run(records: records) { fastestSegments.append(seg) }
+        }
+
+        var conditioned: [ConditionedSegment]
+        if let g = currentGrid {
+            conditioned = EnvironmentalMatcher.matchCurrent(segments: fastestSegments, grid: g)
+        } else {
+            conditioned = fastestSegments.map {
+                ConditionedSegment(
+                    segment: $0,
+                    currentU: nil, currentV: nil, currentSpeedMps: nil, currentDirDeg: nil,
+                    buoyWindSpeedMps: nil, buoyWindDirDeg: nil,
+                    buoyCurrentSpeedMps: nil, buoyCurrentDirDeg: nil,
+                    siscorarCurrentComponent: nil, buoyCurrentComponent: nil, windComponent: nil
+                )
+            }
+        }
+        conditioned = EnvironmentalMatcher.matchBuoy(segments: conditioned, readings: buoyReadings)
+        conditioned = conditioned.map { ApparentConditions.apply(to: $0) }
+        _allConditionedSegments = conditioned
+    }
+
+    /// Probes Treinus for athlete IDs in the team and persists them to the DB.
+    func refreshAthletes() async {
+        guard let teamId = await client.authenticatedTeamId else {
+            errorMessage = "Faça login primeiro."
+            return
+        }
+        isLoading = true
+        loadingMessage = "Buscando atletas… (pode demorar)"
+        errorMessage = nil
+        defer { isLoading = false }
+        do {
+            let maxId = max(10, UserDefaults.standard.integer(forKey: "maxAthleteId"))
+            let ids = try await client.probeAthletes(teamId: teamId, maxId: maxId)
+            let newAthletes = ids.map {
+                Athlete(id: $0, teamId: teamId, fullName: "#\($0)", syncedAt: Date())
+            }
+            try await athleteStore.upsertAll(newAthletes)
+            // observation will push updated list; just pre-select new IDs
+            selectedAthleteIDs = Set(newAthletes.map(\.id))
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    // MARK: - Clear helpers
+
+    func clearAnalysisCache() async {
+        do {
+            try FileCache.clearCurrentGrids()
+            try await exerciseStore.deleteRecordsAndAnalysis()
+            _allConditionedSegments = []
+            _allGpsRecords = [:]
+            currentGrid = nil
+        } catch { errorMessage = error.localizedDescription }
+    }
+
+    func clearBuoyData() async {
+        do {
+            try await buoyStore.deleteAll()
+            buoyReadings = []
+        } catch { errorMessage = error.localizedDescription }
+    }
+
+    func clearAll() async {
+        do {
+            try FileCache.clearCurrentGrids()
+            try await AppDatabase.shared.dbQueue.write { db in
+                try db.execute(sql: "DELETE FROM athletes")
+                try db.execute(sql: "DELETE FROM buoy_observations")
+                try db.execute(sql: "DELETE FROM buoy_coverage")
+            }
+            athletes = []
+            selectedAthleteIDs = []
+            _allConditionedSegments = []
+            _allGpsRecords = [:]
+            buoyReadings = []
+            currentGrid = nil
+        } catch { errorMessage = error.localizedDescription }
+    }
+
+    // MARK: - Helpers
+
+    var formattedDate: String {
+        let fmt = DateFormatter()
+        fmt.locale = Locale(identifier: "pt_BR")
+        fmt.dateStyle = .medium
+        return fmt.string(from: selectedDate)
+    }
+
+    private func bahiaDayPrefix(_ date: Date) -> String {
+        let fmt = DateFormatter()
+        fmt.locale   = Locale(identifier: "en_US_POSIX")
+        fmt.timeZone = AppConfig.timezone
+        fmt.dateFormat = "yyyy-MM-dd"
+        return fmt.string(from: date)
+    }
+}

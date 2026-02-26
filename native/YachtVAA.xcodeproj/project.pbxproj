@@ -1,0 +1,678 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 63;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		02518529B3C6BBA61D8E5E68 /* AthleteStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5DA7E6F22BDDC72BDE726DF /* AthleteStore.swift */; };
+		0661291CDA580AB4E99384BB /* Database.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64918C42A5FAF7146076A7E5 /* Database.swift */; };
+		07842E419756AC0F64DB4F44 /* SimcostaClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB7E9AFCFBC6469DEE83C4E8 /* SimcostaClient.swift */; };
+		0CAB7B2322F7D8214C757D38 /* ApparentConditions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 760BCA2B498D7A5E76298B36 /* ApparentConditions.swift */; };
+		0EAEDB74EF9F445EF1E2AC88 /* TreinusClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34E53C255912D8AF8D43F927 /* TreinusClientTests.swift */; };
+		12FAB83D82ACBC8113B303F5 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 40D83AEDD96C479F44C95354 /* Assets.xcassets */; };
+		1A31EE129204446403C4F7B6 /* BuoyStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD03DF755CAD989B30EBC15B /* BuoyStore.swift */; };
+		2002E451728DB1B1392DDAAA /* AthletesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49C3374DCBB3832596A7E4A1 /* AthletesView.swift */; };
+		20AAE4A5D3C4E3D74BFB9A31 /* HourlyMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21CFD4F8BDC74313D8AA5B10 /* HourlyMapView.swift */; };
+		20CE6C24ED42F9942758363D /* FastestSegment.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7C77A57154AC786D985E4B6 /* FastestSegment.swift */; };
+		23B18790AFAC2EB1B28B2878 /* AppConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F102A2C3B21250E955BBDBA /* AppConfig.swift */; };
+		348787FA010DB206DA4B785B /* PlaceholderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B02D3912012A53EEB77262E /* PlaceholderView.swift */; };
+		3571C6B6FA2564DFE92A1B08 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3100845DCE00D28094FF140E /* LoginView.swift */; };
+		36919EDCF6253D62E1AD8886 /* FileCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B57618680C415A0E9B4DF4B /* FileCache.swift */; };
+		485533810A92771614C642B3 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0CFE5A2BD2710C3255F143B /* ContentView.swift */; };
+		4B1D9A073955B2C6B5C4E5BC /* FastestDistanceAnalyzer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E29CB7083DB8001C6CFC545 /* FastestDistanceAnalyzer.swift */; };
+		578DDD72C33E96856C23FAC2 /* GPSRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FE6192E2E7565895D9C2F6F /* GPSRecord.swift */; };
+		5CE1CEDE3136259164A91FB6 /* TrackMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B967FD887A2C9F687098CB3A /* TrackMapView.swift */; };
+		6B27FE701A07A372DEB8E638 /* LeagueEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCB6C14F68091DEA60BEECAF /* LeagueEntry.swift */; };
+		6F03165CCABD58ABB1F47687 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = 908627D5E50E6CC9827E4DD0 /* GRDB */; };
+		71B513D1AC129D068A85C8BD /* ConditionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B66EF4556970E220A6931E1B /* ConditionsView.swift */; };
+		8253FE8A09275AED17D020A5 /* RankingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1BCE34FC0184610CE86B000 /* RankingsView.swift */; };
+		85153B85F6F2E7AC6E5146A3 /* CredentialManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F47C6F0C11C4903CB78168ED /* CredentialManager.swift */; };
+		854138932FC3BBD7F6F35D36 /* CoordinateConverter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FA306595C1A82FF22753DAC /* CoordinateConverter.swift */; };
+		8845AC55046516B8DB05BCBC /* BuoyReading.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F4B2C6CCA6DC0F147B9FDE9 /* BuoyReading.swift */; };
+		88BDD097205F349D04E41A91 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BF40C0DD7B87347295AA82A /* SettingsView.swift */; };
+		90795F4F3AE2C18ECC7E6BB2 /* YachtVAAApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F938B08506EFCAB3AC7D59A /* YachtVAAApp.swift */; };
+		90980AA367BBCC859235B29A /* AppSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 020CB125D61678EE591FC9FE /* AppSession.swift */; };
+		A2ADC477F66828EE828B2E12 /* TreinusClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE3768B7B29E1C755F5D3F84 /* TreinusClient.swift */; };
+		A41A8F86DD40C0B068FCC478 /* ExerciseStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43405CDBEA268056F691E6D1 /* ExerciseStore.swift */; };
+		AA32C0B5DCBB537CB8C06363 /* LeagueBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 563FB95C9B2C367986F30F1A /* LeagueBuilder.swift */; };
+		B4E34F316E86387CC69E37AD /* SwiftSoup in Frameworks */ = {isa = PBXBuildFile; productRef = 38AC532CEA267C2EA11FEFC1 /* SwiftSoup */; };
+		B5A0452AE147F01358F6D4BD /* Athlete.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FCE3FF2DFB6A058AF353F51 /* Athlete.swift */; };
+		BF1005E118947C72B8470B2E /* ConditionedSegment.swift in Sources */ = {isa = PBXBuildFile; fileRef = E211FB3059CEB9AF913D020B /* ConditionedSegment.swift */; };
+		CA730100C596F3BB52E00942 /* CurrentDataClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57961C8187CF12B0E6EE4A9E /* CurrentDataClient.swift */; };
+		D1B3F17D3B4C49CC84C9800B /* EnvironmentalMatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = A52136ECF104875BA0BC8920 /* EnvironmentalMatcher.swift */; };
+		DBC8DA2B1B7B6F7F65A21EC3 /* CurrentGrid.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC8BB8E668E37C0AD940B0E7 /* CurrentGrid.swift */; };
+		E624D60A48CE5B4ABE3F2CEA /* PolarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2FA454F61CEC6F9FB4F5648 /* PolarView.swift */; };
+		FF44CF3CEB6714D05D94FC05 /* KeychainAccess in Frameworks */ = {isa = PBXBuildFile; productRef = F00EB9916A527748B390AC0E /* KeychainAccess */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		02181D08EC89FDB97EBC1A40 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 7CC83456334F848AEC456377 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 8187264587BACA955EEE1DE2;
+			remoteInfo = YachtVAA;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		020CB125D61678EE591FC9FE /* AppSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSession.swift; sourceTree = "<group>"; };
+		1B02D3912012A53EEB77262E /* PlaceholderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaceholderView.swift; sourceTree = "<group>"; };
+		21CFD4F8BDC74313D8AA5B10 /* HourlyMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HourlyMapView.swift; sourceTree = "<group>"; };
+		3100845DCE00D28094FF140E /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
+		34E53C255912D8AF8D43F927 /* TreinusClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TreinusClientTests.swift; sourceTree = "<group>"; };
+		3F1B94F5F5362FD687A0E4D0 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		3FA306595C1A82FF22753DAC /* CoordinateConverter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoordinateConverter.swift; sourceTree = "<group>"; };
+		40D83AEDD96C479F44C95354 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		43405CDBEA268056F691E6D1 /* ExerciseStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseStore.swift; sourceTree = "<group>"; };
+		49C3374DCBB3832596A7E4A1 /* AthletesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AthletesView.swift; sourceTree = "<group>"; };
+		563FB95C9B2C367986F30F1A /* LeagueBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LeagueBuilder.swift; sourceTree = "<group>"; };
+		57961C8187CF12B0E6EE4A9E /* CurrentDataClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CurrentDataClient.swift; sourceTree = "<group>"; };
+		5F102A2C3B21250E955BBDBA /* AppConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppConfig.swift; sourceTree = "<group>"; };
+		5F4B2C6CCA6DC0F147B9FDE9 /* BuoyReading.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BuoyReading.swift; sourceTree = "<group>"; };
+		5FCE3FF2DFB6A058AF353F51 /* Athlete.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Athlete.swift; sourceTree = "<group>"; };
+		5FE6192E2E7565895D9C2F6F /* GPSRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GPSRecord.swift; sourceTree = "<group>"; };
+		64918C42A5FAF7146076A7E5 /* Database.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Database.swift; sourceTree = "<group>"; };
+		760BCA2B498D7A5E76298B36 /* ApparentConditions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApparentConditions.swift; sourceTree = "<group>"; };
+		7B57618680C415A0E9B4DF4B /* FileCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileCache.swift; sourceTree = "<group>"; };
+		7E29CB7083DB8001C6CFC545 /* FastestDistanceAnalyzer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FastestDistanceAnalyzer.swift; sourceTree = "<group>"; };
+		8F938B08506EFCAB3AC7D59A /* YachtVAAApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YachtVAAApp.swift; sourceTree = "<group>"; };
+		9BF40C0DD7B87347295AA82A /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		A1BCE34FC0184610CE86B000 /* RankingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RankingsView.swift; sourceTree = "<group>"; };
+		A52136ECF104875BA0BC8920 /* EnvironmentalMatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnvironmentalMatcher.swift; sourceTree = "<group>"; };
+		AD4CCD915518CB2BAAEA8F44 /* YachtVAA.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = YachtVAA.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B2FA454F61CEC6F9FB4F5648 /* PolarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PolarView.swift; sourceTree = "<group>"; };
+		B66EF4556970E220A6931E1B /* ConditionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConditionsView.swift; sourceTree = "<group>"; };
+		B7C77A57154AC786D985E4B6 /* FastestSegment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FastestSegment.swift; sourceTree = "<group>"; };
+		B967FD887A2C9F687098CB3A /* TrackMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackMapView.swift; sourceTree = "<group>"; };
+		BB7E9AFCFBC6469DEE83C4E8 /* SimcostaClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimcostaClient.swift; sourceTree = "<group>"; };
+		BC8BB8E668E37C0AD940B0E7 /* CurrentGrid.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CurrentGrid.swift; sourceTree = "<group>"; };
+		BD03DF755CAD989B30EBC15B /* BuoyStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BuoyStore.swift; sourceTree = "<group>"; };
+		CCB6C14F68091DEA60BEECAF /* LeagueEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LeagueEntry.swift; sourceTree = "<group>"; };
+		D0CFE5A2BD2710C3255F143B /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		E211FB3059CEB9AF913D020B /* ConditionedSegment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConditionedSegment.swift; sourceTree = "<group>"; };
+		F382F1B76276F919C9267306 /* YachtVAATests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = YachtVAATests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		F47C6F0C11C4903CB78168ED /* CredentialManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialManager.swift; sourceTree = "<group>"; };
+		F5DA7E6F22BDDC72BDE726DF /* AthleteStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AthleteStore.swift; sourceTree = "<group>"; };
+		FE3768B7B29E1C755F5D3F84 /* TreinusClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TreinusClient.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		99D438094FA8100AB44EF979 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B4E34F316E86387CC69E37AD /* SwiftSoup in Frameworks */,
+				6F03165CCABD58ABB1F47687 /* GRDB in Frameworks */,
+				FF44CF3CEB6714D05D94FC05 /* KeychainAccess in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		1368DE759A65EB00D6D6A736 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				5FCE3FF2DFB6A058AF353F51 /* Athlete.swift */,
+				5F4B2C6CCA6DC0F147B9FDE9 /* BuoyReading.swift */,
+				E211FB3059CEB9AF913D020B /* ConditionedSegment.swift */,
+				BC8BB8E668E37C0AD940B0E7 /* CurrentGrid.swift */,
+				B7C77A57154AC786D985E4B6 /* FastestSegment.swift */,
+				5FE6192E2E7565895D9C2F6F /* GPSRecord.swift */,
+				CCB6C14F68091DEA60BEECAF /* LeagueEntry.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		1B4AAF64CFD22CEC020247C6 /* YachtVAA */ = {
+			isa = PBXGroup;
+			children = (
+				40D83AEDD96C479F44C95354 /* Assets.xcassets */,
+				3F1B94F5F5362FD687A0E4D0 /* Info.plist */,
+			);
+			path = YachtVAA;
+			sourceTree = "<group>";
+		};
+		1BA28DDD71E83BA5C0E50560 /* Storage */ = {
+			isa = PBXGroup;
+			children = (
+				F5DA7E6F22BDDC72BDE726DF /* AthleteStore.swift */,
+				BD03DF755CAD989B30EBC15B /* BuoyStore.swift */,
+				64918C42A5FAF7146076A7E5 /* Database.swift */,
+				43405CDBEA268056F691E6D1 /* ExerciseStore.swift */,
+				7B57618680C415A0E9B4DF4B /* FileCache.swift */,
+			);
+			path = Storage;
+			sourceTree = "<group>";
+		};
+		23474C8E84BE419EB124890C /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				AD4CCD915518CB2BAAEA8F44 /* YachtVAA.app */,
+				F382F1B76276F919C9267306 /* YachtVAATests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		497BE30E4CD6C45F5DFA601E /* App */ = {
+			isa = PBXGroup;
+			children = (
+				5F102A2C3B21250E955BBDBA /* AppConfig.swift */,
+				020CB125D61678EE591FC9FE /* AppSession.swift */,
+				D0CFE5A2BD2710C3255F143B /* ContentView.swift */,
+				8F938B08506EFCAB3AC7D59A /* YachtVAAApp.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		5F810B7994E5E9E9BDB00783 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				F47C6F0C11C4903CB78168ED /* CredentialManager.swift */,
+				57961C8187CF12B0E6EE4A9E /* CurrentDataClient.swift */,
+				BB7E9AFCFBC6469DEE83C4E8 /* SimcostaClient.swift */,
+				FE3768B7B29E1C755F5D3F84 /* TreinusClient.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		7F11C6723DA5044DA6B38297 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				D7359517857C0F8A14701DAA /* Analysis */,
+				497BE30E4CD6C45F5DFA601E /* App */,
+				1368DE759A65EB00D6D6A736 /* Models */,
+				5F810B7994E5E9E9BDB00783 /* Services */,
+				1BA28DDD71E83BA5C0E50560 /* Storage */,
+				8CFEC7ADA94ADBA97405B2A0 /* Views */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
+		8CFEC7ADA94ADBA97405B2A0 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				49C3374DCBB3832596A7E4A1 /* AthletesView.swift */,
+				B66EF4556970E220A6931E1B /* ConditionsView.swift */,
+				21CFD4F8BDC74313D8AA5B10 /* HourlyMapView.swift */,
+				3100845DCE00D28094FF140E /* LoginView.swift */,
+				1B02D3912012A53EEB77262E /* PlaceholderView.swift */,
+				B2FA454F61CEC6F9FB4F5648 /* PolarView.swift */,
+				A1BCE34FC0184610CE86B000 /* RankingsView.swift */,
+				9BF40C0DD7B87347295AA82A /* SettingsView.swift */,
+				B967FD887A2C9F687098CB3A /* TrackMapView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		B14010CFE134FF85726367B2 = {
+			isa = PBXGroup;
+			children = (
+				7F11C6723DA5044DA6B38297 /* Shared */,
+				1B4AAF64CFD22CEC020247C6 /* YachtVAA */,
+				B57CE9FD1FAE32AFCE834874 /* YachtVAATests */,
+				23474C8E84BE419EB124890C /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		B57CE9FD1FAE32AFCE834874 /* YachtVAATests */ = {
+			isa = PBXGroup;
+			children = (
+				34E53C255912D8AF8D43F927 /* TreinusClientTests.swift */,
+			);
+			path = YachtVAATests;
+			sourceTree = "<group>";
+		};
+		D7359517857C0F8A14701DAA /* Analysis */ = {
+			isa = PBXGroup;
+			children = (
+				760BCA2B498D7A5E76298B36 /* ApparentConditions.swift */,
+				3FA306595C1A82FF22753DAC /* CoordinateConverter.swift */,
+				A52136ECF104875BA0BC8920 /* EnvironmentalMatcher.swift */,
+				7E29CB7083DB8001C6CFC545 /* FastestDistanceAnalyzer.swift */,
+				563FB95C9B2C367986F30F1A /* LeagueBuilder.swift */,
+			);
+			path = Analysis;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		8187264587BACA955EEE1DE2 /* YachtVAA */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 3BFD7D94CD25415A0B9C9610 /* Build configuration list for PBXNativeTarget "YachtVAA" */;
+			buildPhases = (
+				9B524FF8E8B5D5A0354D7EFD /* Sources */,
+				C4BCC11004E6246E460D20E1 /* Resources */,
+				99D438094FA8100AB44EF979 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = YachtVAA;
+			packageProductDependencies = (
+				38AC532CEA267C2EA11FEFC1 /* SwiftSoup */,
+				908627D5E50E6CC9827E4DD0 /* GRDB */,
+				F00EB9916A527748B390AC0E /* KeychainAccess */,
+			);
+			productName = YachtVAA;
+			productReference = AD4CCD915518CB2BAAEA8F44 /* YachtVAA.app */;
+			productType = "com.apple.product-type.application";
+		};
+		C8DF581B5FFBF9A9943A08C1 /* YachtVAATests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = BB2292AAA363BCFD96C5212E /* Build configuration list for PBXNativeTarget "YachtVAATests" */;
+			buildPhases = (
+				97E33F0E236DA385A417070C /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				8FADC4A94B6C21A9AE685BC0 /* PBXTargetDependency */,
+			);
+			name = YachtVAATests;
+			packageProductDependencies = (
+			);
+			productName = YachtVAATests;
+			productReference = F382F1B76276F919C9267306 /* YachtVAATests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		7CC83456334F848AEC456377 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					8187264587BACA955EEE1DE2 = {
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = 1FAF95B1192A595BC526625F /* Build configuration list for PBXProject "YachtVAA" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = B14010CFE134FF85726367B2;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				D8B043630BB76B5C3AD10F4E /* XCRemoteSwiftPackageReference "GRDB.swift" */,
+				9CC8068993EDE2DD8F284367 /* XCRemoteSwiftPackageReference "KeychainAccess" */,
+				679EBBE2A8023C24FEA9B342 /* XCRemoteSwiftPackageReference "SwiftSoup" */,
+			);
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				8187264587BACA955EEE1DE2 /* YachtVAA */,
+				C8DF581B5FFBF9A9943A08C1 /* YachtVAATests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		C4BCC11004E6246E460D20E1 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				12FAB83D82ACBC8113B303F5 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		97E33F0E236DA385A417070C /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0EAEDB74EF9F445EF1E2AC88 /* TreinusClientTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9B524FF8E8B5D5A0354D7EFD /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				23B18790AFAC2EB1B28B2878 /* AppConfig.swift in Sources */,
+				90980AA367BBCC859235B29A /* AppSession.swift in Sources */,
+				0CAB7B2322F7D8214C757D38 /* ApparentConditions.swift in Sources */,
+				B5A0452AE147F01358F6D4BD /* Athlete.swift in Sources */,
+				02518529B3C6BBA61D8E5E68 /* AthleteStore.swift in Sources */,
+				2002E451728DB1B1392DDAAA /* AthletesView.swift in Sources */,
+				8845AC55046516B8DB05BCBC /* BuoyReading.swift in Sources */,
+				1A31EE129204446403C4F7B6 /* BuoyStore.swift in Sources */,
+				BF1005E118947C72B8470B2E /* ConditionedSegment.swift in Sources */,
+				71B513D1AC129D068A85C8BD /* ConditionsView.swift in Sources */,
+				485533810A92771614C642B3 /* ContentView.swift in Sources */,
+				854138932FC3BBD7F6F35D36 /* CoordinateConverter.swift in Sources */,
+				85153B85F6F2E7AC6E5146A3 /* CredentialManager.swift in Sources */,
+				CA730100C596F3BB52E00942 /* CurrentDataClient.swift in Sources */,
+				DBC8DA2B1B7B6F7F65A21EC3 /* CurrentGrid.swift in Sources */,
+				0661291CDA580AB4E99384BB /* Database.swift in Sources */,
+				D1B3F17D3B4C49CC84C9800B /* EnvironmentalMatcher.swift in Sources */,
+				A41A8F86DD40C0B068FCC478 /* ExerciseStore.swift in Sources */,
+				4B1D9A073955B2C6B5C4E5BC /* FastestDistanceAnalyzer.swift in Sources */,
+				20CE6C24ED42F9942758363D /* FastestSegment.swift in Sources */,
+				36919EDCF6253D62E1AD8886 /* FileCache.swift in Sources */,
+				578DDD72C33E96856C23FAC2 /* GPSRecord.swift in Sources */,
+				20AAE4A5D3C4E3D74BFB9A31 /* HourlyMapView.swift in Sources */,
+				AA32C0B5DCBB537CB8C06363 /* LeagueBuilder.swift in Sources */,
+				6B27FE701A07A372DEB8E638 /* LeagueEntry.swift in Sources */,
+				3571C6B6FA2564DFE92A1B08 /* LoginView.swift in Sources */,
+				348787FA010DB206DA4B785B /* PlaceholderView.swift in Sources */,
+				E624D60A48CE5B4ABE3F2CEA /* PolarView.swift in Sources */,
+				8253FE8A09275AED17D020A5 /* RankingsView.swift in Sources */,
+				88BDD097205F349D04E41A91 /* SettingsView.swift in Sources */,
+				07842E419756AC0F64DB4F44 /* SimcostaClient.swift in Sources */,
+				5CE1CEDE3136259164A91FB6 /* TrackMapView.swift in Sources */,
+				A2ADC477F66828EE828B2E12 /* TreinusClient.swift in Sources */,
+				90795F4F3AE2C18ECC7E6BB2 /* YachtVAAApp.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		8FADC4A94B6C21A9AE685BC0 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 8187264587BACA955EEE1DE2 /* YachtVAA */;
+			targetProxy = 02181D08EC89FDB97EBC1A40 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		6EB6079B209D5505501D6E9C /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.eleon.yachtvaa.tests;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/YachtVAA.app/YachtVAA";
+			};
+			name = Debug;
+		};
+		7C5D7FE9F6BAAB088848D54D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = YachtVAA/YachtVAA.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER = YES;
+				DEVELOPMENT_TEAM = 994QVUGPX7;
+				INFOPLIST_FILE = YachtVAA/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				"MACOSX_DEPLOYMENT_TARGET[sdk=macosx*]" = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.eleon.yachtvaa;
+				PRODUCT_NAME = YachtVAA;
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = YES;
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		A13F5BFDEA1D828A278F1A43 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = YachtVAA/YachtVAA.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER = YES;
+				DEVELOPMENT_TEAM = 994QVUGPX7;
+				INFOPLIST_FILE = YachtVAA/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				"MACOSX_DEPLOYMENT_TARGET[sdk=macosx*]" = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.eleon.yachtvaa;
+				PRODUCT_NAME = YachtVAA;
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = YES;
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		A3C31BA8B7E8F7B39AAC9C7D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		EB9905F58428F218C5076FCC /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		F2D9D6A224EF948DBAA1D70E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.eleon.yachtvaa.tests;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/YachtVAA.app/YachtVAA";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		1FAF95B1192A595BC526625F /* Build configuration list for PBXProject "YachtVAA" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				EB9905F58428F218C5076FCC /* Debug */,
+				A3C31BA8B7E8F7B39AAC9C7D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		3BFD7D94CD25415A0B9C9610 /* Build configuration list for PBXNativeTarget "YachtVAA" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A13F5BFDEA1D828A278F1A43 /* Debug */,
+				7C5D7FE9F6BAAB088848D54D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		BB2292AAA363BCFD96C5212E /* Build configuration list for PBXNativeTarget "YachtVAATests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6EB6079B209D5505501D6E9C /* Debug */,
+				F2D9D6A224EF948DBAA1D70E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		679EBBE2A8023C24FEA9B342 /* XCRemoteSwiftPackageReference "SwiftSoup" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/scinfu/SwiftSoup.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.7.0;
+			};
+		};
+		9CC8068993EDE2DD8F284367 /* XCRemoteSwiftPackageReference "KeychainAccess" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/kishikawakatsumi/KeychainAccess.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 4.2.2;
+			};
+		};
+		D8B043630BB76B5C3AD10F4E /* XCRemoteSwiftPackageReference "GRDB.swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/groue/GRDB.swift.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 6.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		38AC532CEA267C2EA11FEFC1 /* SwiftSoup */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 679EBBE2A8023C24FEA9B342 /* XCRemoteSwiftPackageReference "SwiftSoup" */;
+			productName = SwiftSoup;
+		};
+		908627D5E50E6CC9827E4DD0 /* GRDB */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D8B043630BB76B5C3AD10F4E /* XCRemoteSwiftPackageReference "GRDB.swift" */;
+			productName = GRDB;
+		};
+		F00EB9916A527748B390AC0E /* KeychainAccess */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 9CC8068993EDE2DD8F284367 /* XCRemoteSwiftPackageReference "KeychainAccess" */;
+			productName = KeychainAccess;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 7CC83456334F848AEC456377 /* Project object */;
+}

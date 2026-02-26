@@ -191,9 +191,10 @@ private struct LeagueRow: View {
                 }
             }
 
-            // Line 3: GPS speed · bearing · components
+            // Line 3: start time · GPS speed · bearing · components
             HStack(spacing: 6) {
                 Spacer().frame(width: Col.indent)
+                Text(formatLocalTime(entry.startTime))
                 Text(String(format: "%.1f km/h · %.0f°", entry.avgSpeedKmh, entry.bearing))
                 if let w = entry.windComponent     { compTag("↗", w) }
                 if let s = entry.siscorarCurrentComponent { compTag("~S", s) }
@@ -218,6 +219,13 @@ private struct LeagueRow: View {
                 .font(.callout)
                 .foregroundStyle(.tertiary)
         }
+    }
+
+    private func formatLocalTime(_ date: Date) -> String {
+        let fmt = DateFormatter()
+        fmt.timeZone = AppConfig.timezone
+        fmt.dateFormat = "HH:mm"
+        return fmt.string(from: date)
     }
 
     @ViewBuilder

@@ -54,6 +54,18 @@ struct SettingsView: View {
                     Text("\(session.athletes.count)")
                         .foregroundStyle(.secondary)
                 }
+                if session.backfillPending > 0 {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text("Baixando histórico…")
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Text("~\(session.backfillPending) restantes")
+                            .font(.caption.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                    }
+                }
                 Stepper("Sondar IDs 1…\(maxAthleteId)", value: $maxAthleteId, in: 10...500, step: 10)
                 Button("Atualizar Atletas") {
                     Task { await session.refreshAthletes() }

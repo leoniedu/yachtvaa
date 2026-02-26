@@ -10,6 +10,7 @@ struct TrackMapView: View {
     @State private var sliderPos: Double = 0
     @State private var isAnimating = false
     @State private var animationTask: Task<Void, Never>?
+    @State private var showCurrents = true
 
     // MARK: - Computed from session
 
@@ -56,14 +57,30 @@ struct TrackMapView: View {
             }
 
             // SISCORAR current arrows at the nearest UTC hour to currentMapTime
-            ForEach(currentArrows(hIdx: nearestSiscorarHourIdx), id: \.id) { arrow in
-                Annotation("", coordinate: arrow.coordinate, anchor: .center) {
-                    Image(systemName: "arrow.up")
-                        .rotationEffect(.degrees(arrow.dirDeg))
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(colorForSpeed(arrow.speedMps))
+            if showCurrents {
+                ForEach(currentArrows(hIdx: nearestSiscorarHourIdx), id: \.id) { arrow in
+                    Annotation("", coordinate: arrow.coordinate, anchor: .center) {
+                        Image(systemName: "arrow.up")
+                            .rotationEffect(.degrees(arrow.dirDeg))
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(colorForSpeed(arrow.speedMps))
+                    }
                 }
             }
+        }
+        .overlay(alignment: .bottomTrailing) {
+            Button {
+                showCurrents.toggle()
+            } label: {
+                Image(systemName: showCurrents ? "water.waves" : "water.waves.slash")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(showCurrents ? Color.accentColor : Color.secondary)
+                    .frame(width: 36, height: 36)
+                    .background(.regularMaterial, in: Circle())
+            }
+            .buttonStyle(.plain)
+            .padding(.trailing, 16)
+            .padding(.bottom, hasGPSRange ? 76 : 16)
         }
         .overlay(alignment: .bottom) {
             VStack(spacing: 6) {

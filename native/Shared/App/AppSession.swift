@@ -53,6 +53,20 @@ final class AppSession: ObservableObject {
     /// All athlete IDs that have GPS data for the loaded date, regardless of selection.
     var allGpsAthleteIds: Set<Int> { Set(_allGpsRecords.keys) }
 
+    /// All GPS records for every athlete (ignores selection filter), but applies the hour filter.
+    var allGpsRecords: [Int: [GPSRecord]] {
+        guard filterStartHour != nil || filterEndHour != nil else { return _allGpsRecords }
+        var cal = Calendar(identifier: .gregorian); cal.timeZone = AppConfig.timezone
+        return _allGpsRecords.mapValues { records in
+            records.filter { r in
+                let h = cal.component(.hour, from: r.ts)
+                if let s = filterStartHour, h < s { return false }
+                if let e = filterEndHour,   h > e { return false }
+                return true
+            }
+        }
+    }
+
     var conditionedSegments: [ConditionedSegment] {
         _allConditionedSegments.filter { selectedAthleteIDs.contains($0.segment.athleteID) }
     }
@@ -76,11 +90,17 @@ final class AppSession: ObservableObject {
 
     /// Keeps the athletes table observation alive.
     private var athleteObservation: AnyDatabaseCancellable?
+    /// Live count of exercises that still lack GPS analysis (auto-updates via GRDB observation).
+    @Published var backfillPending: Int = 0
+    private var backfillObservation: AnyDatabaseCancellable?
 
     /// Single background-sync task. Cancelled before any foreground pipeline run.
     private var backgroundSyncTask: Task<Void, Never>?
     /// In-flight foreground load task. Cancelled when a new load starts.
     private var loadTask: Task<Void, Never>?
+    /// Throttle exercise-list syncs to at most once per interval (in-memory; resets on relaunch).
+    private var lastExerciseListSync: Date?
+    private let exerciseListSyncInterval: TimeInterval = 30 * 60  // 30 minutes
 
     // MARK: - Init
 
@@ -96,6 +116,7 @@ final class AppSession: ObservableObject {
             }) ?? []
             selectedAthleteIDs = Set(athletes.map(\.id))
             startObservingAthletes(teamId: teamId)
+            startObservingBackfill(teamId: teamId)
         }
     }
 
@@ -125,6 +146,29 @@ final class AppSession: ObservableObject {
             )
     }
 
+    /// Tracks how many exercises still lack GPS analysis. Auto-decrements as downloads complete.
+    private func startObservingBackfill(teamId: Int) {
+        backfillObservation = ValueObservation
+            .tracking { db in
+                try Int.fetchOne(db, sql: """
+                    SELECT COUNT(*) FROM exercises
+                    WHERE team_id = ?
+                      AND NOT EXISTS (
+                        SELECT 1 FROM analysis_raw
+                        WHERE analysis_raw.exercise_id = exercises.id
+                          AND analysis_raw.athlete_id  = exercises.athlete_id
+                          AND analysis_raw.team_id     = exercises.team_id
+                      )
+                    """, arguments: [teamId]) ?? 0
+            }
+            .start(
+                in: AppDatabase.shared.dbQueue,
+                scheduling: .async(onQueue: .main),
+                onError: { _ in },
+                onChange: { [weak self] count in self?.backfillPending = count }
+            )
+    }
+
     // MARK: - Authentication
 
     func login(email: String, password: String, teamId: Int?) async {
@@ -136,7 +180,10 @@ final class AppSession: ObservableObject {
             try await client.login(email: email, password: password, teamId: teamId)
             try CredentialManager.save(email: email, password: password, teamId: teamId)
             isLoggedIn = true
-            if let tid = teamId { startObservingAthletes(teamId: tid) }
+            if let tid = teamId {
+                startObservingAthletes(teamId: tid)
+                startObservingBackfill(teamId: tid)
+            }
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -161,7 +208,8 @@ final class AppSession: ObservableObject {
         loadTask = nil
         backgroundSyncTask?.cancel()
         backgroundSyncTask = nil
-        athleteObservation = nil   // stop watching
+        athleteObservation = nil
+        backfillObservation = nil
         try? CredentialManager.clear()
         isLoggedIn = false
         athletes = []
@@ -236,41 +284,57 @@ final class AppSession: ObservableObject {
         guard !knownAthletes.isEmpty else { return }
         let allIds = knownAthletes.map(\.id)
 
-        // Fetch & cache exercise lists from Treinus for all athletes
-        await withTaskGroup(of: Void.self) { group in
-            for id in allIds {
-                group.addTask {
-                    guard let exs = try? await self.client.getExercises(athleteId: id, teamId: teamId)
-                    else { return }
-                    try? await self.exerciseStore.upsertExercises(exs)
+        // Fetch & cache exercise lists from Treinus for all athletes — throttled.
+        let now = Date()
+        let shouldSync = lastExerciseListSync.map { now.timeIntervalSince($0) >= exerciseListSyncInterval } ?? true
+        if shouldSync {
+            await withTaskGroup(of: Void.self) { group in
+                for id in allIds {
+                    group.addTask {
+                        guard let exs = try? await self.client.getExercises(athleteId: id, teamId: teamId)
+                        else { return }
+                        try? await self.exerciseStore.upsertExercises(exs)
+                    }
                 }
             }
+            // Record completion time only after the group finishes so that a cancelled
+            // backgroundSync (rapid date navigation) doesn't block the next 30-min window.
+            lastExerciseListSync = Date()
         }
 
-        // Priority: download GPS analysis for the selected date first
+        // Priority: download GPS for the selected date first so the UI has data immediately.
         let dayExercises = (try? await exerciseStore.fetchExercises(
             athleteIds: allIds, datePrefix: bahiaDayPrefix(selectedDate)
         )) ?? []
         await downloadMissingAnalysis(for: dayExercises, teamId: teamId)
 
-        // (athletes list is kept current by the ValueObservation — no manual refresh needed)
-
-        // Then fill the ±1 month window around the selected date (capped at today)
-        let cal = Calendar.current
-        let windowStart = cal.date(byAdding: .month, value: -1, to: selectedDate) ?? selectedDate
-        let windowEnd   = min(cal.date(byAdding: .month, value: 1, to: selectedDate) ?? selectedDate, Date())
-        let windowExercises = (try? await exerciseStore.fetchExercisesInRange(
-            athleteIds: allIds, from: bahiaDayPrefix(windowStart), to: bahiaDayPrefix(windowEnd)
+        // Backfill: download GPS for every exercise that still lacks it, most-recent first.
+        // fetchExercisesWithoutAnalysis excludes what was just downloaded above.
+        // If this task is cancelled (user changes date), progress is preserved in DB;
+        // the next backgroundSync resumes from where it left off.
+        // On subsequent syncs after the backfill is complete, this list naturally contains
+        // only new exercises — giving us "refresh only new" for free.
+        let allMissing = (try? await exerciseStore.fetchExercisesWithoutAnalysis(
+            athleteIds: allIds, teamId: teamId
         )) ?? []
-        let dayKeys = Set(dayExercises.map { "\($0.id)-\($0.athleteId)-\($0.teamId)" })
-        await downloadMissingAnalysis(for: windowExercises.filter { !dayKeys.contains("\($0.id)-\($0.athleteId)-\($0.teamId)") }, teamId: teamId)
+        await downloadMissingAnalysis(for: allMissing, teamId: teamId)
     }
 
     private func downloadMissingAnalysis(for exercises: [ExerciseRow], teamId: Int) async {
         // Capture on main actor before entering the concurrent task group.
         let placeholders = Set(athletes.filter { $0.fullName.hasPrefix("#") }.map(\.id))
+        // Gentle API usage: at most 2 concurrent calls, at least 1 s between each launch.
+        let maxConcurrent = 2
         await withTaskGroup(of: Void.self) { group in
+            var inflight = 0
             for row in exercises {
+                guard !Task.isCancelled else { break }
+                // If at capacity, wait for one slot to free before adding more.
+                if inflight >= maxConcurrent {
+                    await group.next()
+                    inflight -= 1
+                }
+                inflight += 1
                 group.addTask {
                     let needsAnalysis = (try? await self.exerciseStore.hasAnalysis(exerciseId: row.id, athleteId: row.athleteId, teamId: teamId)) == false
                     let needsName     = placeholders.contains(row.athleteId)
@@ -281,6 +345,8 @@ final class AppSession: ObservableObject {
                     // upsertAnalysis writes GPS records and athlete name in one transaction
                     try? await self.exerciseStore.upsertAnalysis(analysis, teamId: teamId)
                 }
+                // Throttle: pause before launching the next request.
+                try? await Task.sleep(nanoseconds: 1_000_000_000)  // 1 s
             }
         }
     }
@@ -289,15 +355,18 @@ final class AppSession: ObservableObject {
         // Use ALL known athletes so in-memory selection filter always works without reload.
         let athleteIds = athletes.isEmpty ? Array(selectedAthleteIDs) : athletes.map(\.id)
 
-        // 1. Always refresh exercise lists — lightweight metadata, keeps DB current for any date.
-        //    Errors are swallowed so loadFromCache still works offline.
-        loadingMessage = "Sincronizando exercícios…"
-        await withTaskGroup(of: Void.self) { group in
-            for id in athleteIds {
-                group.addTask {
-                    guard let exs = try? await self.client.getExercises(athleteId: id, teamId: teamId)
-                    else { return }
-                    try? await self.exerciseStore.upsertExercises(exs)
+        // 1. When syncing explicitly: refresh exercise lists from Treinus (lightweight metadata).
+        //    Skipped during loadFromCache (syncTreinus: false) — backgroundSync handles this
+        //    silently so the foreground path stays fully offline/DB-only.
+        if syncTreinus {
+            loadingMessage = "Sincronizando exercícios…"
+            await withTaskGroup(of: Void.self) { group in
+                for id in athleteIds {
+                    group.addTask {
+                        guard let exs = try? await self.client.getExercises(athleteId: id, teamId: teamId)
+                        else { return }
+                        try? await self.exerciseStore.upsertExercises(exs)
+                    }
                 }
             }
         }
@@ -438,7 +507,8 @@ final class AppSession: ObservableObject {
         _allConditionedSegments = conditioned
     }
 
-    /// Probes Treinus for athlete IDs in the team and persists them to the DB.
+    /// Probes Treinus for athlete IDs, persists them, then bootstraps the last
+    /// `bootstrapExerciseCount` GPS analyses per athlete so the app is immediately useful.
     func refreshAthletes() async {
         guard let teamId = await client.authenticatedTeamId else {
             errorMessage = "Faça login primeiro."
@@ -457,6 +527,35 @@ final class AppSession: ObservableObject {
             try await athleteStore.upsertAll(newAthletes)
             // observation will push updated list; just pre-select new IDs
             selectedAthleteIDs = Set(newAthletes.map(\.id))
+
+            // Bootstrap: fetch exercise lists for all athletes, then download GPS analysis
+            // for the most recent exercises. One-time wait; makes app immediately useful.
+            loadingMessage = "Baixando listas de exercícios…"
+            var allExercises: [TreinusExercise] = []
+            await withTaskGroup(of: [TreinusExercise].self) { group in
+                for id in ids {
+                    group.addTask {
+                        (try? await self.client.getExercises(athleteId: id, teamId: teamId)) ?? []
+                    }
+                }
+                for await exs in group { allExercises.append(contentsOf: exs) }
+            }
+            try await exerciseStore.upsertExercises(allExercises)
+
+            let bootstrapCount = 10
+            loadingMessage = "Baixando GPS dos últimos \(bootstrapCount) exercícios por atleta…"
+            // Take last N per athlete (sorted by start string, which is lexicographically ordered).
+            let recentRows = Dictionary(grouping: allExercises, by: \.athleteId)
+                .flatMap { _, exs in
+                    exs.sorted { ($0.start ?? "") > ($1.start ?? "") }.prefix(bootstrapCount)
+                }
+                .map { ex in
+                    ExerciseRow(id: ex.id, athleteId: ex.athleteId, teamId: ex.teamId,
+                                genreName: ex.genreName, start: ex.start ?? "",
+                                distanceM: ex.distanceM, elapsedSec: ex.totalElapsedTimeSec,
+                                extraJson: nil)
+                }
+            await downloadMissingAnalysis(for: recentRows, teamId: teamId)
         } catch {
             errorMessage = error.localizedDescription
         }

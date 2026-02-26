@@ -27,7 +27,8 @@ enum LeagueBuilder {
                 buoyCurrentComponent:           buoyKmh,
                 speedThroughWaterSiscorarKmh:   stwSiscorar,
                 speedThroughWaterBuoyKmh:       stwBuoy,
-                bearing:                        cs.segment.bearing
+                bearing:                        cs.segment.bearing,
+                startTime:                      cs.segment.startTime
             )
         }
     }

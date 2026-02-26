@@ -119,6 +119,42 @@ struct ExerciseStore {
         }
     }
 
+    /// Returns exercises that have no GPS analysis yet, ordered for fair round-robin backfill:
+    /// rank 1 (most recent) of every athlete first, then rank 2, then rank 3, …
+    /// Within each rank tier, newer exercises come first.
+    /// Result naturally shrinks to only new exercises once the backfill is complete.
+    func fetchExercisesWithoutAnalysis(athleteIds: [Int], teamId: Int) async throws -> [ExerciseRow] {
+        guard !athleteIds.isEmpty else { return [] }
+        return try await dbQueue.read { db in
+            let placeholders = athleteIds.map { _ in "?" }.joined(separator: ",")
+            let sql = """
+                SELECT id, athlete_id, team_id, genre_name, start,
+                       distance_m, elapsed_sec, extra_json
+                FROM (
+                    SELECT id, athlete_id, team_id, genre_name, start,
+                           distance_m, elapsed_sec, extra_json,
+                           ROW_NUMBER() OVER (
+                               PARTITION BY athlete_id
+                               ORDER BY start DESC
+                           ) AS rn
+                    FROM exercises
+                    WHERE team_id = ?
+                      AND athlete_id IN (\(placeholders))
+                      AND NOT EXISTS (
+                        SELECT 1 FROM analysis_raw
+                        WHERE analysis_raw.exercise_id = exercises.id
+                          AND analysis_raw.athlete_id  = exercises.athlete_id
+                          AND analysis_raw.team_id     = exercises.team_id
+                      )
+                )
+                ORDER BY rn, start DESC
+                """
+            var args: [DatabaseValueConvertible] = [teamId]
+            args.append(contentsOf: athleteIds)
+            return try ExerciseRow.fetchAll(db, sql: sql, arguments: StatementArguments(args))
+        }
+    }
+
     /// Returns raw GPS rows for an athlete set within a Unix-second time window.
     func fetchRecords(athleteIds: [Int], from: Int, to: Int) async throws -> [RecordRow] {
         try await dbQueue.read { db in

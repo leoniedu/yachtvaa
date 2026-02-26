@@ -3,7 +3,7 @@ import SwiftUI
 struct ConditionsView: View {
     @EnvironmentObject private var session: AppSession
 
-    private let headers = ["Hora", "Vento", "Dir.", "Corrente SISCORAR", "Dir.", "Boia", "Dir."]
+    private let headers = ["Hora", "Vento km/h", "Dir.", "Corr. SISCORAR km/h", "Dir.", "Boia km/h", "Dir."]
 
     var body: some View {
         if session.buoyReadings.isEmpty && session.currentGrid == nil {
@@ -87,11 +87,11 @@ struct ConditionsView: View {
     private func dataRow(hour: Int, buoy: BuoyReading?, siscorar: (speedMps: Double, dirDeg: Double)?) -> some View {
         HStack(spacing: 0) {
             cell(String(format: "%02d:00", hour), width: colWidth(headers[0]), hasData: true)
-            cell(fmt(buoy?.windSpeedMps, "%.1f"), width: colWidth(headers[1]), hasData: buoy?.windSpeedMps != nil)
+            cell(fmtKmh(buoy?.windSpeedMps), width: colWidth(headers[1]), hasData: buoy?.windSpeedMps != nil)
             cell(fmtDeg(buoy?.windDirectionDeg), width: colWidth(headers[2]), hasData: buoy?.windDirectionDeg != nil)
-            cell(fmt(siscorar?.speedMps, "%.3f"), width: colWidth(headers[3]), hasData: siscorar != nil)
+            cell(fmtKmh(siscorar?.speedMps), width: colWidth(headers[3]), hasData: siscorar != nil)
             cell(fmtDeg(siscorar?.dirDeg), width: colWidth(headers[4]), hasData: siscorar != nil)
-            cell(fmt(buoy?.currentSpeedMps, "%.3f"), width: colWidth(headers[5]), hasData: buoy?.currentSpeedMps != nil)
+            cell(fmtKmh(buoy?.currentSpeedMps), width: colWidth(headers[5]), hasData: buoy?.currentSpeedMps != nil)
             cell(fmtDeg(buoy?.currentDirectionDeg), width: colWidth(headers[6]), hasData: buoy?.currentDirectionDeg != nil)
         }
     }
@@ -105,9 +105,9 @@ struct ConditionsView: View {
             .padding(.vertical, 4)
     }
 
-    private func fmt(_ val: Double?, _ format: String) -> String {
-        guard let v = val else { return "—" }
-        return String(format: format, v)
+    private func fmtKmh(_ mps: Double?) -> String {
+        guard let v = mps else { return "—" }
+        return String(format: "%.1f", v * 3.6)
     }
 
     private func fmtDeg(_ val: Double?) -> String {
@@ -116,6 +116,6 @@ struct ConditionsView: View {
     }
 
     private func colWidth(_ header: String) -> CGFloat {
-        header == "Hora" ? 52 : header.contains("Corrente") ? 110 : 60
+        header == "Hora" ? 52 : header.contains("Corr.") ? 130 : header == "Dir." ? 56 : 72
     }
 }

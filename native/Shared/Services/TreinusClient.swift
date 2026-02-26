@@ -113,7 +113,7 @@ struct TreinusRecord {
     private static let tsFmt: DateFormatter = {
         let f = DateFormatter()
         f.locale   = Locale(identifier: "en_US_POSIX")
-        f.timeZone = AppConfig.timezone   // "yyyy-MM-dd HH:mm:ss" is in Bahia local time
+        f.timeZone = TimeZone(identifier: "UTC")!  // "yyyy-MM-dd HH:mm:ss" strings from Treinus are UTC
         f.dateFormat = "yyyy-MM-dd HH:mm:ss"
         return f
     }()

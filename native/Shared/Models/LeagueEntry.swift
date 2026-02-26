@@ -15,4 +15,5 @@ struct LeagueEntry: Identifiable {
     let speedThroughWaterSiscorarKmh: Double?
     let speedThroughWaterBuoyKmh: Double?
     let bearing: Double
+    let startTime: Date
 }

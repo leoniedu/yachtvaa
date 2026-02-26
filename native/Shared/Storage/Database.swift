@@ -233,6 +233,31 @@ final class AppDatabase {
                           on: "records", columns: ["ts", "position_lat", "position_lon"])
         }
 
+        // Fix Strava-uploaded GPS records whose timestamps are local BRT
+        // stored as if UTC. Detected by: first record ts ≈ strftime('%s', start)
+        // instead of ≈ strftime('%s', start) + 10800 (the BRT→UTC shift).
+        migrator.registerMigration("v4") { db in
+            try db.execute(sql: """
+                UPDATE records
+                SET ts = ts + 10800
+                WHERE EXISTS (
+                    SELECT 1
+                    FROM (
+                        SELECT r.exercise_id, r.athlete_id, r.team_id
+                        FROM records r
+                        JOIN exercises e ON r.exercise_id = e.id
+                            AND r.athlete_id = e.athlete_id
+                            AND r.team_id = e.team_id
+                        GROUP BY r.exercise_id, r.athlete_id, r.team_id
+                        HAVING ABS(MIN(r.ts) - CAST(strftime('%s', e.start) AS INTEGER)) < 1800
+                    ) affected
+                    WHERE records.exercise_id = affected.exercise_id
+                      AND records.athlete_id = affected.athlete_id
+                      AND records.team_id = affected.team_id
+                )
+                """)
+        }
+
         try migrator.migrate(dbQueue)
     }
 

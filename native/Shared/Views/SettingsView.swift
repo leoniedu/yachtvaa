@@ -33,20 +33,6 @@ struct SettingsView: View {
                 .disabled(email.isEmpty || password.isEmpty || session.isLoading)
             }
 
-            Section("Análise") {
-                HStack {
-                    Text("Distância de referência")
-                    Spacer()
-                    TextField("metros", value: $session.analysisDistanceM, format: .number)
-                        .keyboardType(.decimalPad)
-                        .multilineTextAlignment(.trailing)
-                        .frame(width: 80)
-                        .onChange(of: session.analysisDistanceM) { _ in session.rerunAnalysis() }
-                    Text("m")
-                        .foregroundStyle(.secondary)
-                }
-            }
-
             Section("Atletas") {
                 HStack {
                     Text("Atletas carregados")

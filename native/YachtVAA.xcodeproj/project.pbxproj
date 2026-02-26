@@ -15,7 +15,6 @@
 		12FAB83D82ACBC8113B303F5 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 40D83AEDD96C479F44C95354 /* Assets.xcassets */; };
 		1A31EE129204446403C4F7B6 /* BuoyStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD03DF755CAD989B30EBC15B /* BuoyStore.swift */; };
 		2002E451728DB1B1392DDAAA /* AthletesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49C3374DCBB3832596A7E4A1 /* AthletesView.swift */; };
-		20AAE4A5D3C4E3D74BFB9A31 /* HourlyMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21CFD4F8BDC74313D8AA5B10 /* HourlyMapView.swift */; };
 		20CE6C24ED42F9942758363D /* FastestSegment.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7C77A57154AC786D985E4B6 /* FastestSegment.swift */; };
 		23B18790AFAC2EB1B28B2878 /* AppConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F102A2C3B21250E955BBDBA /* AppConfig.swift */; };
 		24E94C35FECA4913493137E1 /* PRBoardComputer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 712D702AFAD1B99ED3BBD76D /* PRBoardComputer.swift */; };
@@ -46,7 +45,6 @@
 		CA730100C596F3BB52E00942 /* CurrentDataClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57961C8187CF12B0E6EE4A9E /* CurrentDataClient.swift */; };
 		D1B3F17D3B4C49CC84C9800B /* EnvironmentalMatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = A52136ECF104875BA0BC8920 /* EnvironmentalMatcher.swift */; };
 		DBC8DA2B1B7B6F7F65A21EC3 /* CurrentGrid.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC8BB8E668E37C0AD940B0E7 /* CurrentGrid.swift */; };
-		E624D60A48CE5B4ABE3F2CEA /* PolarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2FA454F61CEC6F9FB4F5648 /* PolarView.swift */; };
 		F3599BBE7064BA34E70076F6 /* PRBoardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89D22E57728EEDAF7461945B /* PRBoardView.swift */; };
 		FF44CF3CEB6714D05D94FC05 /* KeychainAccess in Frameworks */ = {isa = PBXBuildFile; productRef = F00EB9916A527748B390AC0E /* KeychainAccess */; };
 /* End PBXBuildFile section */
@@ -64,7 +62,6 @@
 /* Begin PBXFileReference section */
 		020CB125D61678EE591FC9FE /* AppSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSession.swift; sourceTree = "<group>"; };
 		1B02D3912012A53EEB77262E /* PlaceholderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaceholderView.swift; sourceTree = "<group>"; };
-		21CFD4F8BDC74313D8AA5B10 /* HourlyMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HourlyMapView.swift; sourceTree = "<group>"; };
 		3100845DCE00D28094FF140E /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
 		34E53C255912D8AF8D43F927 /* TreinusClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TreinusClientTests.swift; sourceTree = "<group>"; };
 		3F1B94F5F5362FD687A0E4D0 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -90,7 +87,6 @@
 		A52136ECF104875BA0BC8920 /* EnvironmentalMatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnvironmentalMatcher.swift; sourceTree = "<group>"; };
 		A81A570A25C44E618FA840E1 /* PREntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PREntry.swift; sourceTree = "<group>"; };
 		AD4CCD915518CB2BAAEA8F44 /* YachtVAA.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = YachtVAA.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		B2FA454F61CEC6F9FB4F5648 /* PolarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PolarView.swift; sourceTree = "<group>"; };
 		B66EF4556970E220A6931E1B /* ConditionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConditionsView.swift; sourceTree = "<group>"; };
 		B7C77A57154AC786D985E4B6 /* FastestSegment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FastestSegment.swift; sourceTree = "<group>"; };
 		B967FD887A2C9F687098CB3A /* TrackMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackMapView.swift; sourceTree = "<group>"; };
@@ -205,10 +201,8 @@
 			children = (
 				49C3374DCBB3832596A7E4A1 /* AthletesView.swift */,
 				B66EF4556970E220A6931E1B /* ConditionsView.swift */,
-				21CFD4F8BDC74313D8AA5B10 /* HourlyMapView.swift */,
 				3100845DCE00D28094FF140E /* LoginView.swift */,
 				1B02D3912012A53EEB77262E /* PlaceholderView.swift */,
-				B2FA454F61CEC6F9FB4F5648 /* PolarView.swift */,
 				89D22E57728EEDAF7461945B /* PRBoardView.swift */,
 				A1BCE34FC0184610CE86B000 /* RankingsView.swift */,
 				9BF40C0DD7B87347295AA82A /* SettingsView.swift */,
@@ -375,7 +369,6 @@
 				20CE6C24ED42F9942758363D /* FastestSegment.swift in Sources */,
 				36919EDCF6253D62E1AD8886 /* FileCache.swift in Sources */,
 				578DDD72C33E96856C23FAC2 /* GPSRecord.swift in Sources */,
-				20AAE4A5D3C4E3D74BFB9A31 /* HourlyMapView.swift in Sources */,
 				AA32C0B5DCBB537CB8C06363 /* LeagueBuilder.swift in Sources */,
 				6B27FE701A07A372DEB8E638 /* LeagueEntry.swift in Sources */,
 				3571C6B6FA2564DFE92A1B08 /* LoginView.swift in Sources */,
@@ -383,7 +376,6 @@
 				F3599BBE7064BA34E70076F6 /* PRBoardView.swift in Sources */,
 				6FEE09FBBE9ABB929C96369D /* PREntry.swift in Sources */,
 				348787FA010DB206DA4B785B /* PlaceholderView.swift in Sources */,
-				E624D60A48CE5B4ABE3F2CEA /* PolarView.swift in Sources */,
 				8253FE8A09275AED17D020A5 /* RankingsView.swift in Sources */,
 				88BDD097205F349D04E41A91 /* SettingsView.swift in Sources */,
 				07842E419756AC0F64DB4F44 /* SimcostaClient.swift in Sources */,

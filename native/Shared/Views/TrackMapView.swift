@@ -36,7 +36,7 @@ struct TrackMapView: View {
         Map(initialPosition: .region(
             MKCoordinateRegion(
                 center: AppConfig.mapCenter,
-                span: MKCoordinateSpan(latitudeDelta: 0.135, longitudeDelta: 0.135)
+                span: MKCoordinateSpan(latitudeDelta: 0.09, longitudeDelta: 0.09)
             )
         )) {
             // GPS tracks trimmed to currentMapTime

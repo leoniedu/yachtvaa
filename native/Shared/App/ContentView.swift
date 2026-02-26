@@ -31,14 +31,8 @@ struct ContentView: View {
                     ConditionsView()
                         .tabItem { Label("Condições", systemImage: "wind") }
 
-                    PolarView()
-                        .tabItem { Label("Polares", systemImage: "chart.pie") }
-
                     RankingsView()
                         .tabItem { Label("Classif.", systemImage: "list.number") }
-
-                    HourlyMapView()
-                        .tabItem { Label("Horário", systemImage: "clock") }
                 }
 
                 if session.isLoading {

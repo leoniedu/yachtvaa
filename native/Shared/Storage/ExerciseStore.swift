@@ -267,6 +267,10 @@ struct ExerciseStore {
     /// Stores analysis JSON, bulk-inserts GPS records, and writes the athlete name — all in one transaction.
     /// Replaces any existing analysis for the exercise (safe to call repeatedly).
     /// The athlete name is written only when the current `athletes` row is a `#id` placeholder.
+    ///
+    /// Detects timezone mismatches (e.g. Strava uploads in local time vs Garmin in UTC) by
+    /// comparing the first GPS record's timestamp to the exercise `start` field. If the offset
+    /// is ≈ ±3h (Bahia UTC-3), all record timestamps are corrected.
     func upsertAnalysis(_ analysis: TreinusAnalysis, teamId: Int) async throws {
         let isoNow = ISO8601DateFormatter().string(from: Date())
         let raw = AnalysisRaw(
@@ -276,6 +280,15 @@ struct ExerciseStore {
             rawJson: jsonString(analysis.rawJSON) ?? "{}",
             downloadedAt: isoNow
         )
+
+        // Detect timezone offset: compare exercise `start` (local BRT) to first GPS record.
+        let tzCorrection = try await detectTzCorrection(
+            exerciseId: analysis.exerciseId,
+            athleteId: analysis.athleteId,
+            teamId: teamId,
+            firstRecordTs: analysis.records.first?.timestamp
+        )
+
         let records: [RecordRow] = analysis.records.compactMap { r in
             guard let ts = r.timestamp else { return nil }
             return RecordRow(
@@ -283,7 +296,7 @@ struct ExerciseStore {
                 exerciseId: analysis.exerciseId,
                 athleteId: analysis.athleteId,
                 teamId: teamId,
-                ts: ts,
+                ts: ts + tzCorrection,
                 positionLat: r.positionLat,
                 positionLon: r.positionLong,
                 distanceM: r.distance,
@@ -333,6 +346,47 @@ struct ExerciseStore {
     }
 
     // MARK: - Helper
+
+    /// Compares the exercise `start` (local Bahia time) to the first GPS record timestamp.
+    /// If the offset is ≈ ±3h (Bahia UTC-3), returns the correction in seconds.
+    /// Strava uploads local-time timestamps; Garmin/Amazfit upload UTC. This detects and fixes the mismatch.
+    private func detectTzCorrection(
+        exerciseId: Int, athleteId: Int, teamId: Int,
+        firstRecordTs: Int?
+    ) async throws -> Int {
+        guard let firstTs = firstRecordTs else { return 0 }
+
+        // Look up exercise `start` from DB (local time string like "2026-02-25 06:15:00").
+        let startStr: String? = try await dbQueue.read { db in
+            try String.fetchOne(db, sql: """
+                SELECT start FROM exercises WHERE id = ? AND athlete_id = ? AND team_id = ?
+                """, arguments: [exerciseId, athleteId, teamId])
+        }
+        guard let startStr, !startStr.isEmpty else { return 0 }
+
+        // Parse exercise `start` as Bahia local time → UTC.
+        let fmt = DateFormatter()
+        fmt.locale   = Locale(identifier: "en_US_POSIX")
+        fmt.timeZone = AppConfig.timezone  // America/Bahia (UTC-3)
+        fmt.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        // Also try ISO8601 with T separator
+        guard let startDate = fmt.date(from: startStr)
+                ?? fmt.date(from: startStr.replacingOccurrences(of: "T", with: " "))
+        else { return 0 }
+
+        let expectedUTC = Int(startDate.timeIntervalSince1970)
+        let diff = firstTs - expectedUTC  // negative if timestamps are local (behind UTC)
+
+        // If diff ≈ ±10800 (3h), the timestamps have the wrong timezone.
+        let bahiaOffset = AppConfig.timezone.secondsFromGMT()  // typically -10800
+        let expectedDrift = bahiaOffset  // -10800 for UTC-3
+        if abs(diff - expectedDrift) < 1800 {  // within 30 min of the expected tz error
+            let correction = -expectedDrift  // +10800: shift local timestamps to UTC
+            return correction
+        }
+
+        return 0
+    }
 
     private func jsonString(_ dict: [String: Any]) -> String? {
         guard let data = try? JSONSerialization.data(withJSONObject: dict),
